@@ -4,17 +4,19 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use shuttle_secrets::SecretStore;
-use tracing::{error, info};
+use tracing::info;
+
+mod message;
+pub mod utils;
 
 struct Bot;
 
 #[async_trait]
 impl EventHandler for Bot {
     async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content == "!hello" {
-            if let Err(e) = msg.channel_id.say(&ctx.http, "world!").await {
-                error!("Error sending message: {:?}", e);
-            }
+        match utils::first_letter(&msg.content) {
+            '$' => message::handle_command(msg, ctx).await,
+            _ => (),
         }
     }
 
