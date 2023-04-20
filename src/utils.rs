@@ -1,7 +1,10 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use serenity::{model::prelude::Message, prelude::Context, client::bridge::gateway::ShardId, gateway::ConnectionStage};
+use serenity::{
+    client::bridge::gateway::ShardId, gateway::ConnectionStage, model::prelude::Message,
+    prelude::Context,
+};
 use tracing::error;
 
 use crate::ShardManagerContainer;
