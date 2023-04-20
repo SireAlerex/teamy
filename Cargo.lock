@@ -2041,7 +2041,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "teamy-test"
+name = "teamy"
 version = "0.1.0"
 dependencies = [
  "anyhow",
