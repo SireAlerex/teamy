@@ -1,18 +1,37 @@
-use anyhow::anyhow;
-use serenity::async_trait;
-use serenity::model::channel::Message;
-use serenity::model::gateway::Ready;
-use serenity::model::prelude::Activity;
-use serenity::prelude::*;
-use shuttle_secrets::SecretStore;
-use tracing::info;
-use rand::{seq::IteratorRandom, thread_rng};
-use std::sync::Mutex;
-
+mod commands;
+pub mod consts;
+mod loops;
 mod message;
 pub mod utils;
 
-struct Bot;
+use anyhow::anyhow;
+use serenity::async_trait;
+use serenity::client::bridge::gateway::ShardManager;
+use serenity::framework::standard::macros::group;
+use serenity::framework::StandardFramework;
+use serenity::http::Http;
+use serenity::model::channel::Message;
+use serenity::model::gateway::Ready;
+use serenity::model::prelude::GuildId;
+use serenity::prelude::*;
+use shuttle_secrets::SecretStore;
+use std::collections::HashSet;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+use tracing::info;
+
+use crate::commands::{bonjour::*, latency::*, ping::*, slide::*};
+
+struct ShardManagerContainer;
+
+impl TypeMapKey for ShardManagerContainer {
+    type Value = Arc<tokio::sync::Mutex<ShardManager>>;
+}
+
+struct Bot {
+    is_loop_running: AtomicBool,
+}
 
 #[async_trait]
 impl EventHandler for Bot {
@@ -21,15 +40,44 @@ impl EventHandler for Bot {
             return;
         }
         match utils::first_letter(&msg.content) {
-            '$' => message::handle_command(msg, ctx).await,
-            _ => (),
+            '$' => (), // do nothing if command
+            _ => message::handle_reaction(msg, ctx).await,
         }
     }
 
-    async fn ready(&self, _: Context, ready: Ready) {
+    async fn ready(&self, ctx: Context, ready: Ready) {
         info!("{} is connected!", ready.user.name);
+
+        let ctx: Arc<Context> = Arc::new(ctx);
+        if !self.is_loop_running.load(Ordering::Relaxed) {
+            let ctx1 = Arc::clone(&ctx);
+
+            tokio::spawn(async move {
+                loop {
+                    loops::status_loop(Arc::clone(&ctx1)).await;
+                    tokio::time::sleep(Duration::from_secs(60)).await;
+                }
+            });
+
+            let ctx2 = Arc::clone(&ctx);
+
+            tokio::spawn(async move {
+                loop {
+                    loops::log_system_load(Arc::clone(&ctx2)).await;
+                    tokio::time::sleep(Duration::from_secs(300)).await;
+                }
+            });
+        }
+    }
+
+    async fn cache_ready(&self, _ctx: Context, _guilds: Vec<GuildId>) {
+        info!("Cache built successfully !");
     }
 }
+
+#[group]
+#[commands(bonjour, ping, latency, slide)]
+struct General;
 
 #[shuttle_runtime::main]
 async fn serenity(
@@ -41,37 +89,39 @@ async fn serenity(
     } else {
         return Err(anyhow!("'DISCORD_TOKEN' was not found").into());
     };
+    let http = Http::new(&token);
+
+    let (owners, _bot_id) = match http.get_current_application_info().await {
+        Ok(info) => {
+            let mut owners = HashSet::new();
+            owners.insert(info.owner.id);
+
+            (owners, info.id)
+        }
+        Err(why) => panic!("Could not access application info: {:?}", why),
+    };
+
+    let framework = StandardFramework::new()
+        .configure(|c| c.owners(owners).prefix("$"))
+        .group(&GENERAL_GROUP);
 
     // Set gateway intents, which decides what events the bot will be notified about
-    let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
+    let intents = GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::MESSAGE_CONTENT
+        | GatewayIntents::DIRECT_MESSAGES;
 
     let client = Client::builder(&token, intents)
-        .event_handler(Bot)
+        .framework(framework)
+        .event_handler(Bot {
+            is_loop_running: AtomicBool::new(false),
+        })
         .await
-        .expect("Err creating client");
+        .expect("Error creating client");
 
-    let manager = client.shard_manager.clone();
-    let game_pool = Mutex::new(vec!["LoL avec les boys", "Deep Rock Galactic avec les boys",
-    "Pathfinder avec les boys", "Minecraft avec les boys", "Civ6 avec les boys", "être raciste", "manger son caca",
-    "[STRENG GEHEIM]"]);
-
-    tokio::task::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
-        loop {
-            interval.tick().await;
-            let lock = manager.lock().await;
-            let shard_runners = lock.runners.lock().await;
-            let game = *game_pool.lock().unwrap().iter().choose(&mut thread_rng()).unwrap();
-
-            for (id, runner) in shard_runners.iter() {
-                runner.runner_tx.set_activity(Some(Activity::playing(game)));
-                println!(
-                    "Shard ID {} is {} with a latency of {:?}",
-                    id, runner.stage, runner.latency
-                );
-            };
-        }
-    });
+    {
+        let mut data = client.data.write().await;
+        data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
+    }
 
     Ok(client.into())
 }
