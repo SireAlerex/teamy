@@ -1,15 +1,12 @@
-use serenity::prelude::*;
+use crate::utils;
 use serenity::model::channel::Message;
-use tracing::error;
+use serenity::prelude::*;
 
 pub async fn handle_command(msg: Message, ctx: Context) {
-    let command = msg.content;
-    match command.as_str()   {
-        "bonjour" => if let Err(e) = msg.channel_id.say(&ctx.http, "Bonjour !").await {
-            error!("Error sending message: {:?}", e);
-        },
-        _ => if let Err(e) = msg.channel_id.say(&ctx.http, "Commande inconnue").await {
-            error!("Error sending message: {:?}", e);
-        },
+    let command = utils::remove_suffix(&msg.content);
+    match command.as_str() {
+        "bonjour" => utils::send_message(msg, ctx, "Bonjour !").await,
+        "slide" => utils::send_dm(msg, ctx, "Salut !").await,
+        _ => utils::send_message(msg, ctx, format!("Commande inconnue : {}", &command).as_str()).await,
     }
 }
