@@ -29,8 +29,7 @@ pub async fn find_message(
         .messages(&ctx.http, |retriever| retriever.limit(10))
         .await?
         .iter()
-        .filter(|m: &&Message| m.author == user.clone() && m.content == text)
-        .nth(0)
+        .find(|m: &&Message| m.author == user.clone() && m.content == text)
     {
         Ok(m.clone())
     } else {

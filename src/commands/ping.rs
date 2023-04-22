@@ -18,7 +18,7 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
 pub async fn run(ctx: &Context) -> String {
     match utils::runner_latency(Arc::new(ctx.clone())).await {
         Some(l) => format!("Pong ! ``{:#?}``", l),
-        None => format!("Pong ! (il y a un problème pour accéder à la latence du bot, veuillez réessayer dans 1min)")
+        None => "Pong ! (il y a un problème pour accéder à la latence du bot, veuillez réessayer dans 1min)".to_string()
     }
 }
 

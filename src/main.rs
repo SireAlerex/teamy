@@ -167,7 +167,7 @@ impl EventHandler for Bot {
                     }),
                 },
                 _ => InteractionResponse::Message(InteractionMessage {
-                    content: format!("Unkown data kind"),
+                    content: "Unkown data kind".to_owned(),
                     ephemeral: true,
                 }),
             };

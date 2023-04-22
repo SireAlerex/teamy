@@ -39,15 +39,15 @@ pub async fn run_message(ctx: &Context, command: &ApplicationCommandInteraction)
     if let Some(target_id) = command.data.target_id {
         let message_id = target_id.to_message_id();
         if let Ok(message) = command.channel_id.message(&ctx.http, message_id).await {
-            return format!("{} -{}", run(&message.content), message.author.name);
+            format!("{} -{}", run(&message.content), message.author.name)
         } else {
-            return format!(
+            format!(
                 "Erreur pour trouver le message correspondant à {}",
                 message_id
-            );
+            )
         }
     } else {
-        return format!("Erreur pour accéder au MessageId de l'interaction");
+        "Erreur pour accéder au MessageId de l'interaction".to_string()
     }
 }
 

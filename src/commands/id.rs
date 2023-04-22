@@ -45,7 +45,7 @@ pub async fn run_user(ctx: &Context, command: &ApplicationCommandInteraction) ->
             format!("L'id de l'utilisateur est {}", target_id)
         }
     } else {
-        format!("Pas de TargetId dans l'interaction")
+        "Pas de TargetId dans l'interaction".to_string()
     }
 }
 
