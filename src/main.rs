@@ -23,7 +23,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info};
 
-use crate::commands::{bonjour::*, nerd::*, ping::*, slide::*};
+use crate::commands::{bonjour::*, id::*, nerd::*, ping::*, slide::*};
 
 struct ShardManagerContainer;
 
@@ -104,6 +104,8 @@ impl EventHandler for Bot {
                 .create_application_command(|command| commands::ping::register(command))
                 .create_application_command(|command| commands::nerd::register_chat_input(command))
                 .create_application_command(|command| commands::nerd::register_message(command))
+                .create_application_command(|command| commands::id::register_user(command))
+                .create_application_command(|command| commands::id::register_chat_input(command))
         })
         .await;
 
@@ -135,6 +137,10 @@ impl EventHandler for Bot {
                         content: commands::nerd::run_chat_input(&command.data.options),
                         ephemeral: false,
                     }),
+                    "id" => InteractionResponse::Message(InteractionMessage {
+                        content: commands::id::run_chat_input(&command.data.options),
+                        ephemeral: false,
+                    }),
                     _ => InteractionResponse::Message(InteractionMessage {
                         content: format!("Unkown command ChatInput : {}", command.data.name),
                         ephemeral: true,
@@ -150,7 +156,16 @@ impl EventHandler for Bot {
                         ephemeral: true,
                     }),
                 },
-                CommandType::User => todo!(),
+                CommandType::User => match command.data.name.as_str() {
+                    "id" => InteractionResponse::Message(InteractionMessage {
+                        content: commands::id::run_user(&ctx, &command).await,
+                        ephemeral: false,
+                    }),
+                    _ => InteractionResponse::Message(InteractionMessage {
+                        content: format!("Unkown command User : {}", command.data.name),
+                        ephemeral: true,
+                    }),
+                },
                 _ => InteractionResponse::Message(InteractionMessage {
                     content: format!("Unkown data kind"),
                     ephemeral: true,
@@ -173,7 +188,7 @@ impl EventHandler for Bot {
 }
 
 #[group]
-#[commands(bonjour, ping, slide, nerd)]
+#[commands(bonjour, ping, slide, nerd, id)]
 struct General;
 
 #[shuttle_runtime::main]
