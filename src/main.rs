@@ -97,7 +97,11 @@ impl EventHandler for Bot {
         .await;
 
         info!("I have the following commands : {:#?}", commands);
-        info!("Ok ? {}", commands.is_ok());
+        if commands.is_ok() {
+            info!("Commands Ok !");
+        } else {
+            info!("Commands Error !");
+        }
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {

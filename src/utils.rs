@@ -4,14 +4,8 @@ use std::time::Duration;
 use serenity::{
     client::bridge::gateway::ShardId,
     gateway::ConnectionStage,
-    model::{
-        prelude::{
-            interaction::{
-                application_command::ApplicationCommandInteraction, InteractionResponseType,
-            },
-            ChannelId, Message,
-        },
-        user::User,
+    model::prelude::interaction::{
+        application_command::ApplicationCommandInteraction, InteractionResponseType,
     },
     prelude::Context,
 };
@@ -27,24 +21,6 @@ pub fn remove_suffix(s: &str) -> String {
     let mut c = s.chars();
     c.next();
     c.collect()
-}
-
-pub async fn send_message(channel_id: ChannelId, ctx: &Context, text: &str) {
-    if let Err(e) = channel_id.say(&ctx.http, text).await {
-        error!("Error sending message: {:?}", e);
-    }
-}
-
-pub async fn reply_message(msg: Message, ctx: &Context, text: &str) {
-    if let Err(e) = msg.reply(&ctx.http, text).await {
-        error!("Error sending message: {:?}", e);
-    }
-}
-
-pub async fn send_dm(user: User, ctx: &Context, text: &str) {
-    if let Err(e) = user.dm(&ctx.http, |m| m.content(text)).await {
-        error!("Error sending message: {:?}", e);
-    }
 }
 
 pub fn nerdify(text: &str) -> String {
