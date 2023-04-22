@@ -23,7 +23,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info};
 
-use crate::commands::{bonjour::*, latency::*, nerd::*, ping::*, slide::*};
+use crate::commands::{bonjour::*, nerd::*, ping::*, slide::*};
 
 struct ShardManagerContainer;
 
@@ -35,6 +35,15 @@ struct GuildIdContainer;
 
 impl TypeMapKey for GuildIdContainer {
     type Value = Arc<tokio::sync::Mutex<GuildId>>;
+}
+
+struct InteractionMessage {
+    content: String,
+    ephemeral: bool,
+}
+
+enum InteractionResponse {
+    Message(InteractionMessage),
 }
 
 struct Bot {
@@ -92,6 +101,7 @@ impl EventHandler for Bot {
             commands
                 .create_application_command(|command| commands::bonjour::register(command))
                 .create_application_command(|command| commands::slide::register(command))
+                .create_application_command(|command| commands::ping::register(command))
                 .create_application_command(|command| commands::nerd::register_chat_input(command))
                 .create_application_command(|command| commands::nerd::register_message(command))
         })
@@ -107,62 +117,63 @@ impl EventHandler for Bot {
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
-            match command.data.kind {
-                CommandType::ChatInput => {
-                    match command.data.name.as_str() {
-                        "bonjour" => {
-                            utils::interaction_response_message(
-                                &ctx,
-                                &command,
-                                commands::bonjour::run(),
-                                false,
-                            )
-                            .await
-                        }
-                        "slide" => {
-                            utils::interaction_response_message(
-                                &ctx,
-                                &command,
-                                commands::slide::run(&ctx, &command).await,
-                                true,
-                            )
-                            .await
-                        }
-                        "nerd" => {
-                            utils::interaction_response_message(
-                                &ctx,
-                                &command,
-                                commands::nerd::run_chat_input(&command.data.options),
-                                false,
-                            )
-                            .await
-                        }
-                        _ => error!("Unkown command ChatInput : {}", command.data.name),
-                    };
-                }
+            let result: InteractionResponse = match command.data.kind {
+                CommandType::ChatInput => match command.data.name.as_str() {
+                    "bonjour" => InteractionResponse::Message(InteractionMessage {
+                        content: commands::bonjour::run(),
+                        ephemeral: false,
+                    }),
+                    "slide" => InteractionResponse::Message(InteractionMessage {
+                        content: commands::slide::run(&ctx, &command).await,
+                        ephemeral: true,
+                    }),
+                    "ping" => InteractionResponse::Message(InteractionMessage {
+                        content: commands::ping::run(&ctx).await,
+                        ephemeral: false,
+                    }),
+                    "nerd" => InteractionResponse::Message(InteractionMessage {
+                        content: commands::nerd::run_chat_input(&command.data.options),
+                        ephemeral: false,
+                    }),
+                    _ => InteractionResponse::Message(InteractionMessage {
+                        content: format!("Unkown command ChatInput : {}", command.data.name),
+                        ephemeral: true,
+                    }),
+                },
                 CommandType::Message => match command.data.name.as_str() {
-                    "nerd" => {
-                        utils::interaction_response_message(
-                            &ctx,
-                            &command,
-                            commands::nerd::run_message(&ctx, &command).await,
-                            false,
-                        )
-                        .await
-                    }
-                    _ => error!("Unkown command message name : {}", command.data.name),
+                    "nerd" => InteractionResponse::Message(InteractionMessage {
+                        content: commands::nerd::run_message(&ctx, &command).await,
+                        ephemeral: false,
+                    }),
+                    _ => InteractionResponse::Message(InteractionMessage {
+                        content: format!("Unkown command Message : {}", command.data.name),
+                        ephemeral: true,
+                    }),
                 },
                 CommandType::User => todo!(),
-                _ => {
-                    error!("Unkown data kind");
+                _ => InteractionResponse::Message(InteractionMessage {
+                    content: format!("Unkown data kind"),
+                    ephemeral: true,
+                }),
+            };
+
+            match result {
+                InteractionResponse::Message(interaction) => {
+                    utils::interaction_response_message(
+                        &ctx,
+                        &command,
+                        interaction.content,
+                        interaction.ephemeral,
+                    )
+                    .await
                 }
             }
-        }
+        };
     }
 }
 
 #[group]
-#[commands(bonjour, ping, latency, slide, nerd)]
+#[commands(bonjour, ping, slide, nerd)]
 struct General;
 
 #[shuttle_runtime::main]
