@@ -91,6 +91,7 @@ impl EventHandler for Bot {
         let commands = GuildId::set_application_commands(&test_guild_id, &ctx.http, |commands| {
             commands
                 .create_application_command(|command| commands::bonjour::register(command))
+                .create_application_command(|command| commands::slide::register(command))
                 .create_application_command(|command| commands::nerd::register_chat_input(command))
                 .create_application_command(|command| commands::nerd::register_message(command))
         })
@@ -114,6 +115,16 @@ impl EventHandler for Bot {
                                 &ctx,
                                 &command,
                                 commands::bonjour::run(),
+                                false,
+                            )
+                            .await
+                        }
+                        "slide" => {
+                            utils::interaction_response_message(
+                                &ctx,
+                                &command,
+                                commands::slide::run(&ctx, &command).await,
+                                true,
                             )
                             .await
                         }
@@ -122,6 +133,7 @@ impl EventHandler for Bot {
                                 &ctx,
                                 &command,
                                 commands::nerd::run_chat_input(&command.data.options),
+                                false,
                             )
                             .await
                         }
@@ -134,6 +146,7 @@ impl EventHandler for Bot {
                             &ctx,
                             &command,
                             commands::nerd::run_message(&ctx, &command).await,
+                            false,
                         )
                         .await
                     }

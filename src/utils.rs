@@ -4,14 +4,39 @@ use std::time::Duration;
 use serenity::{
     client::bridge::gateway::ShardId,
     gateway::ConnectionStage,
-    model::prelude::interaction::{
-        application_command::ApplicationCommandInteraction, InteractionResponseType,
+    model::{
+        prelude::{
+            interaction::{
+                application_command::ApplicationCommandInteraction, InteractionResponseType,
+            },
+            ChannelId, Message,
+        },
+        user::User,
     },
     prelude::Context,
 };
 use tracing::error;
 
 use crate::ShardManagerContainer;
+
+pub async fn find_message(
+    ctx: &Context,
+    user: &User,
+    channel: &ChannelId,
+    text: String,
+) -> Result<Message, serenity::Error> {
+    if let Some(m) = channel
+        .messages(&ctx.http, |retriever| retriever.limit(10))
+        .await?
+        .iter()
+        .filter(|m: &&Message| m.author == user.clone() && m.content == text)
+        .nth(0)
+    {
+        Ok(m.clone())
+    } else {
+        Err(serenity::Error::Other("Aucun message correspondant"))
+    }
+}
 
 pub fn first_letter(s: &str) -> char {
     s.chars().next().unwrap()
@@ -39,12 +64,13 @@ pub async fn interaction_response_message(
     ctx: &Context,
     command: &ApplicationCommandInteraction,
     text: String,
+    ephemeral: bool,
 ) {
     if let Err(why) = command
         .create_interaction_response(&ctx.http, |response| {
             response
                 .kind(InteractionResponseType::ChannelMessageWithSource)
-                .interaction_response_data(|message| message.content(text))
+                .interaction_response_data(|message| message.content(text).ephemeral(ephemeral))
         })
         .await
     {
