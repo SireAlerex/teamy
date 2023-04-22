@@ -1,3 +1,5 @@
+pub static SALUTATIONS: [&str; 4] = ["Bonjour", "Salut", "Coucou", "Yo"];
+
 pub static GAME_POOL: [&str; 8] = [
     "LoL avec les boys",
     "Deep Rock Galactic avec les boys",

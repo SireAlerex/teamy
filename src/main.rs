@@ -12,6 +12,8 @@ use serenity::framework::StandardFramework;
 use serenity::http::Http;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
+use serenity::model::prelude::command::CommandType;
+use serenity::model::prelude::interaction::Interaction;
 use serenity::model::prelude::GuildId;
 use serenity::prelude::*;
 use shuttle_secrets::SecretStore;
@@ -19,14 +21,20 @@ use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::info;
+use tracing::{error, info};
 
-use crate::commands::{bonjour::*, latency::*, ping::*, slide::*};
+use crate::commands::{bonjour::*, latency::*, nerd::*, ping::*, slide::*};
 
 struct ShardManagerContainer;
 
 impl TypeMapKey for ShardManagerContainer {
     type Value = Arc<tokio::sync::Mutex<ShardManager>>;
+}
+
+struct GuildIdContainer;
+
+impl TypeMapKey for GuildIdContainer {
+    type Value = Arc<tokio::sync::Mutex<GuildId>>;
 }
 
 struct Bot {
@@ -68,15 +76,76 @@ impl EventHandler for Bot {
                 }
             });
         }
+
+        let data = ctx.data.read().await;
+        let test_guild_id = match data.get::<GuildIdContainer>() {
+            Some(id) => id,
+            None => {
+                error!("There was a problem getting the test guild id");
+                return;
+            }
+        }
+        .lock()
+        .await;
+
+        let commands = GuildId::set_application_commands(&test_guild_id, &ctx.http, |commands| {
+            commands
+                .create_application_command(|command| commands::bonjour::register(command))
+                .create_application_command(|command| commands::nerd::register_chat_input(command))
+                .create_application_command(|command| commands::nerd::register_message(command))
+        })
+        .await;
+
+        info!("I have the following commands : {:#?}", commands);
+        info!("Ok ? {}", commands.is_ok());
     }
 
-    async fn cache_ready(&self, _ctx: Context, _guilds: Vec<GuildId>) {
-        info!("Cache built successfully !");
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::ApplicationCommand(command) = interaction {
+            match command.data.kind {
+                CommandType::ChatInput => {
+                    match command.data.name.as_str() {
+                        "bonjour" => {
+                            utils::interaction_response_message(
+                                &ctx,
+                                &command,
+                                commands::bonjour::run(),
+                            )
+                            .await
+                        }
+                        "nerd" => {
+                            utils::interaction_response_message(
+                                &ctx,
+                                &command,
+                                commands::nerd::run_chat_input(&command.data.options),
+                            )
+                            .await
+                        }
+                        _ => error!("Unkown command ChatInput : {}", command.data.name),
+                    };
+                }
+                CommandType::Message => match command.data.name.as_str() {
+                    "nerd" => {
+                        utils::interaction_response_message(
+                            &ctx,
+                            &command,
+                            commands::nerd::run_message(&ctx, &command).await,
+                        )
+                        .await
+                    }
+                    _ => error!("Unkown command message name : {}", command.data.name),
+                },
+                CommandType::User => todo!(),
+                _ => {
+                    error!("Unkown data kind");
+                }
+            }
+        }
     }
 }
 
 #[group]
-#[commands(bonjour, ping, latency, slide)]
+#[commands(bonjour, ping, latency, slide, nerd)]
 struct General;
 
 #[shuttle_runtime::main]
@@ -118,9 +187,19 @@ async fn serenity(
         .await
         .expect("Error creating client");
 
+    let test_guild_id = if let Some(id) = secret_store.get("TEST_GUILD_ID") {
+        id
+    } else {
+        return Err(anyhow!("'TEST_GUILD_ID' was not found").into());
+    };
+    let test_guild_id = Arc::new(tokio::sync::Mutex::new(GuildId(
+        test_guild_id.parse().expect("GUILD_ID should be u64"),
+    )));
+
     {
         let mut data = client.data.write().await;
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
+        data.insert::<GuildIdContainer>(Arc::clone(&test_guild_id));
     }
 
     Ok(client.into())

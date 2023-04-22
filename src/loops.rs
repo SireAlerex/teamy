@@ -1,10 +1,7 @@
 use chrono::prelude::*;
 use rand::{seq::IteratorRandom, thread_rng};
 use serenity::model::prelude::Activity;
-use serenity::{
-    model::{prelude::ChannelId},
-    prelude::Context,
-};
+use serenity::{model::prelude::ChannelId, prelude::Context};
 use std::sync::Arc;
 use tracing::error;
 
