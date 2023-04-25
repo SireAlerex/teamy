@@ -23,7 +23,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info};
 
-use crate::commands::{bonjour::*, id::*, nerd::*, ping::*, slide::*};
+use crate::commands::{bonjour::*, id::*, nerd::*, ping::*, slide::*, roll::*};
 
 struct ShardManagerContainer;
 
@@ -106,6 +106,7 @@ impl EventHandler for Bot {
                 .create_application_command(|command| commands::nerd::register_message(command))
                 .create_application_command(|command| commands::id::register_user(command))
                 .create_application_command(|command| commands::id::register_chat_input(command))
+                .create_application_command(|command| commands::roll::register(command))
         })
         .await;
 
@@ -139,6 +140,10 @@ impl EventHandler for Bot {
                     }),
                     "id" => InteractionResponse::Message(InteractionMessage {
                         content: commands::id::run_chat_input(&command.data.options),
+                        ephemeral: false,
+                    }),
+                    "roll" => InteractionResponse::Message(InteractionMessage {
+                        content: commands::roll::run_chat_input(&command.data.options),
                         ephemeral: false,
                     }),
                     _ => InteractionResponse::Message(InteractionMessage {
@@ -188,7 +193,7 @@ impl EventHandler for Bot {
 }
 
 #[group]
-#[commands(bonjour, ping, slide, nerd, id)]
+#[commands(bonjour, ping, slide, nerd, id, roll)]
 struct General;
 
 #[shuttle_runtime::main]

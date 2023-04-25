@@ -1,5 +1,5 @@
 use serenity::framework::standard::macros::command;
-use serenity::framework::standard::CommandResult;
+use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::command::CommandOptionType;
 use serenity::model::prelude::interaction::application_command::{
     CommandDataOption, CommandDataOptionValue,
@@ -16,24 +16,13 @@ use serenity::{
 };
 
 #[command]
-pub async fn id(ctx: &Context, msg: &Message) -> CommandResult {
-    let mut user_input = msg.content.split_whitespace();
-    if let Ok(user) = User::convert(
-        ctx,
-        msg.guild_id,
-        Some(msg.channel_id),
-        user_input.nth(1).unwrap(),
-    )
-    .await
-    {
-        let text = format!("L'id de {} est {}", user.clone().tag(), user.id);
-        let _ = msg.channel_id.say(&ctx.http, text).await?;
-    } else {
-        let _ = msg
-            .channel_id
-            .say(&ctx.http, "L'utilisateur n'a pas pu être trouvé")
-            .await?;
-    }
+pub async fn id(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let user_input = args.message();
+    let text = match User::convert(ctx, msg.guild_id, Some(msg.channel_id), user_input).await {
+        Ok(user) => format!("L'id de {} est {}", user.clone().tag(), user.id),
+        Err(e) => format!("L'utilisateur n'a pas pu être trouvé : {e}")
+    };
+    let _ = msg.channel_id.say(&ctx.http, text).await?;
     Ok(())
 }
 
