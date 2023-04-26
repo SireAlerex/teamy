@@ -1,16 +1,48 @@
 use rand::Rng;
 use serenity::builder::CreateApplicationCommand;
-use serenity::framework::standard::{CommandResult, Args};
 use serenity::framework::standard::macros::command;
+use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::application::command::CommandOptionType;
-use serenity::model::prelude::Message;
 use serenity::model::prelude::interaction::application_command::{
     CommandDataOption, CommandDataOptionValue,
 };
+use serenity::model::prelude::Message;
 use serenity::prelude::Context;
 
 #[command]
 pub async fn roll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    let d_split: Vec<&str> = args.message().split('d').collect();
+    let size;
+    let n;
+    let mut modifier = 0;
+    if d_split.len() == 2 {
+        n = d_split[0].parse::<i64>().unwrap_or(1);
+        if !(1..=200).contains(&n) {
+            return Err("1 <= #dices <= 200".into());
+        }
+        let (char, pos) = if !d_split[1].contains("-") {
+            ('+', true)
+        } else {
+            ('-', false)
+        };
+        let mod_split: Vec<&str> = d_split[1].split(char).collect();
+        size = mod_split[0].parse::<i64>()?;
+        if size < 1 {
+            return Err("dice size >= 1".into());
+        }
+        if mod_split.len() == 2 {
+            modifier = if pos {
+                mod_split[1].parse::<i64>()?
+            } else {
+                -mod_split[1].parse::<i64>()?
+            };
+        }
+    } else {
+        return Err("bad syntax, must be '$roll <x>d<n>+<y>'".into());
+    }
+    msg.channel_id
+        .say(&ctx.http, run(size, n, modifier))
+        .await?;
     Ok(())
 }
 
@@ -18,7 +50,7 @@ pub fn run(size: i64, n: i64, modifier: i64) -> String {
     let mut rng = rand::thread_rng();
     let mut res: String = String::new();
     let mut sum = modifier;
-  
+
     for _ in 0..n {
         let roll = rng.gen_range(1..=size);
         sum += roll;
@@ -64,7 +96,7 @@ pub fn run_chat_input(_options: &[CommandDataOption]) -> String {
             _ => (),
         }
     }
-    
+
     run(size, n, modifier)
 }
 

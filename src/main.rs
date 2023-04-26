@@ -23,7 +23,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info};
 
-use crate::commands::{bonjour::*, id::*, nerd::*, ping::*, slide::*, roll::*};
+use crate::commands::{bonjour::*, id::*, nerd::*, ping::*, roll::*, slide::*};
 
 struct ShardManagerContainer;
 

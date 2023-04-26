@@ -20,7 +20,7 @@ pub async fn id(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     let user_input = args.message();
     let text = match User::convert(ctx, msg.guild_id, Some(msg.channel_id), user_input).await {
         Ok(user) => format!("L'id de {} est {}", user.clone().tag(), user.id),
-        Err(e) => format!("L'utilisateur n'a pas pu être trouvé : {e}")
+        Err(e) => format!("L'utilisateur n'a pas pu être trouvé : {e}"),
     };
     let _ = msg.channel_id.say(&ctx.http, text).await?;
     Ok(())
