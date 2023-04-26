@@ -69,7 +69,7 @@ pub fn run(size: i64, n: i64, modifier: i64) -> String {
     res = match modifier.cmp(&0) {
         Ordering::Greater => format!("{}(+{}) ", res, modifier),
         Ordering::Less => format!("{}({}) ", res, modifier),
-        Ordering::Equal => res
+        Ordering::Equal => res,
     };
 
     if modifier != 0 || n > 1 {

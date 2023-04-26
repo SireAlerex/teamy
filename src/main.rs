@@ -59,9 +59,12 @@ impl EventHandler for Bot {
         if msg.author.bot {
             return;
         }
-        match utils::first_letter(&msg.content) {
-            '$' => (), // do nothing if command
-            _ => message::handle_reaction(msg, ctx).await,
+        let x = match utils::first_letter(&msg.content) {
+            '$' => "".to_owned(), // do nothing if command
+            _ => message::handle_reaction(&ctx, &msg).await,
+        };
+        if x.as_str() != "" {
+            let _ = msg.channel_id.say(&ctx.http, x).await;
         }
     }
 
