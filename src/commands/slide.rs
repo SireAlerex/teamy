@@ -7,6 +7,7 @@ use serenity::model::prelude::Message;
 use serenity::prelude::Context;
 
 #[command]
+#[description = "Slide dans tes dm"]
 async fn slide(ctx: &Context, msg: &Message) -> CommandResult {
     msg.author.dm(&ctx.http, |m| m.content("Salut !")).await?;
 

@@ -9,6 +9,7 @@ use serenity::model::prelude::Message;
 use serenity::prelude::Context;
 
 #[command]
+#[description = "Donne la latence du bot"]
 async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
     msg.channel_id.say(&ctx.http, run(ctx).await).await?;
 
@@ -25,6 +26,6 @@ pub async fn run(ctx: &Context) -> String {
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
     command
         .name("ping")
-        .description("Envoi un ping au bot")
+        .description("Donne la latence du bot")
         .kind(CommandType::ChatInput)
 }

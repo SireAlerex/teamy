@@ -16,6 +16,11 @@ use serenity::{
 };
 
 #[command]
+#[description = "Affiche l'id d'un utilisateur"]
+#[usage = "<nom OU nom#tag OU mention>"]
+#[example = "boup"]
+#[example = "boup#1234"]
+#[example = "@boup"]
 pub async fn id(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     let user_input = args.message();
     let text = match User::convert(ctx, msg.guild_id, Some(msg.channel_id), user_input).await {

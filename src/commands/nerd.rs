@@ -13,6 +13,8 @@ use serenity::{
 };
 
 #[command]
+#[description = "Nerdifie un texte"]
+#[usage = "<texte à transformer>"]
 pub async fn nerd(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     msg.channel_id.say(&ctx.http, run(args.message())).await?;
     Ok(())
@@ -60,7 +62,7 @@ pub fn register_chat_input(
 ) -> &mut CreateApplicationCommand {
     command
         .name("nerd")
-        .description("Nerdify un texte")
+        .description("Nerdifie un texte")
         .create_option(|option| {
             option
                 .name("texte")

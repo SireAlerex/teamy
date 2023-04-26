@@ -7,14 +7,17 @@ pub mod utils;
 use anyhow::anyhow;
 use serenity::async_trait;
 use serenity::client::bridge::gateway::ShardManager;
-use serenity::framework::standard::macros::group;
+use serenity::framework::standard::macros::{group, help, hook};
+use serenity::framework::standard::{
+    help_commands, Args, CommandGroup, CommandResult, HelpOptions,
+};
 use serenity::framework::StandardFramework;
 use serenity::http::Http;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::model::prelude::command::CommandType;
 use serenity::model::prelude::interaction::Interaction;
-use serenity::model::prelude::GuildId;
+use serenity::model::prelude::{GuildId, UserId};
 use serenity::prelude::*;
 use shuttle_secrets::SecretStore;
 use std::collections::HashSet;
@@ -196,6 +199,34 @@ impl EventHandler for Bot {
 #[commands(bonjour, ping, slide, nerd, id, roll)]
 struct General;
 
+#[help]
+#[individual_command_tip = "Pour obtenir plus d'informations à propos d'une commande, utilisez la commande en argument."]
+#[command_not_found_text = "Commande non trouvée : '{}'."]
+#[max_levenshtein_distance(3)]
+#[lacking_permissions = "Hide"]
+async fn my_help(
+    ctx: &Context,
+    msg: &Message,
+    args: Args,
+    help_options: &'static HelpOptions,
+    groups: &[&'static CommandGroup],
+    owners: HashSet<UserId>,
+) -> CommandResult {
+    let _ = help_commands::with_embeds(ctx, msg, args, help_options, groups, owners).await;
+    Ok(())
+}
+
+#[hook]
+async fn after(_ctx: &Context, _msg: &Message, command_name: &str, command_result: CommandResult) {
+    match command_result {
+        Ok(()) => info!("Processed command '{}'", command_name),
+        Err(why) => error!(
+            "Command '{}' returned error {:?} (message was '{}')",
+            command_name, why, _msg.content
+        ),
+    }
+}
+
 #[shuttle_runtime::main]
 async fn serenity(
     #[shuttle_secrets::Secrets] secret_store: SecretStore,
@@ -220,6 +251,8 @@ async fn serenity(
 
     let framework = StandardFramework::new()
         .configure(|c| c.owners(owners).prefix("$"))
+        .after(after)
+        .help(&MY_HELP)
         .group(&GENERAL_GROUP);
 
     // Set gateway intents, which decides what events the bot will be notified about

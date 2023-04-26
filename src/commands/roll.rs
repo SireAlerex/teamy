@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use rand::Rng;
 use serenity::builder::CreateApplicationCommand;
 use serenity::framework::standard::macros::command;
@@ -10,6 +12,12 @@ use serenity::model::prelude::Message;
 use serenity::prelude::Context;
 
 #[command]
+#[aliases("r")]
+#[description = "Lancer de dés"]
+#[usage = "<nombre de dés>d<taille des dés>+<modificateur>"]
+#[example = "2d6+3"]
+#[example = "3d4-1"]
+#[example = "d8"]
 pub async fn roll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     let d_split: Vec<&str> = args.message().split('d').collect();
     let size;
@@ -20,7 +28,7 @@ pub async fn roll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
         if !(1..=200).contains(&n) {
             return Err("1 <= #dices <= 200".into());
         }
-        let (char, pos) = if !d_split[1].contains("-") {
+        let (char, pos) = if !d_split[1].contains('-') {
             ('+', true)
         } else {
             ('-', false)
@@ -54,15 +62,15 @@ pub fn run(size: i64, n: i64, modifier: i64) -> String {
     for _ in 0..n {
         let roll = rng.gen_range(1..=size);
         sum += roll;
-        res = format!("{}{}{}", res, roll.to_string(), " + ");
+        res = format!("{}{}{}", res, roll, " + ");
     }
     res = res[..res.len() - 2].to_string(); //remove last "+ "
 
-    if modifier > 0 {
-        res = format!("{}(+{}) ", res, modifier);
-    } else if modifier < 0 {
-        res = format!("{}({}) ", res, modifier);
-    }
+    res = match modifier.cmp(&0) {
+        Ordering::Greater => format!("{}(+{}) ", res, modifier),
+        Ordering::Less => format!("{}({}) ", res, modifier),
+        Ordering::Equal => res
+    };
 
     if modifier != 0 || n > 1 {
         res = format!("{}= {}", res, sum);
@@ -103,11 +111,11 @@ pub fn run_chat_input(_options: &[CommandDataOption]) -> String {
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
     command
         .name("roll")
-        .description("roll desc")
+        .description("Lancer de dés")
         .create_option(|option| {
             option
                 .name("size")
-                .description("size desc")
+                .description("Taille des dés")
                 .kind(CommandOptionType::Integer)
                 .min_int_value(2)
                 .max_int_value(1000)
@@ -116,7 +124,7 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
         .create_option(|option| {
             option
                 .name("number")
-                .description("number desc")
+                .description("Nombre de dés")
                 .kind(CommandOptionType::Integer)
                 .min_int_value(1)
                 .max_int_value(100)
@@ -124,7 +132,7 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
         .create_option(|option| {
             option
                 .name("modifier")
-                .description("modifier desc")
+                .description("Modificateur")
                 .kind(CommandOptionType::Integer)
         })
 }

@@ -9,6 +9,7 @@ use serenity::model::prelude::Message;
 use serenity::prelude::Context;
 
 #[command]
+#[description = "Dis bonjour"]
 async fn bonjour(ctx: &Context, msg: &Message) -> CommandResult {
     msg.channel_id.say(&ctx.http, run()).await?;
 
