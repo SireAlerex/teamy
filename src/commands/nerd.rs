@@ -20,7 +20,7 @@ pub async fn nerd(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     Ok(())
 }
 
-fn run(text: &str) -> String {
+pub fn run(text: &str) -> String {
     format!("\"{} :nerd:\"", utils::nerdify(text))
 }
 

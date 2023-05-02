@@ -1,18 +1,30 @@
+use crate::commands::nerd;
 use crate::consts;
 use rand::seq::SliceRandom;
-use serenity::{model::{channel::Message, prelude::{Emoji, GuildId}}, prelude::Context};
+use serenity::{
+    model::{
+        channel::Message,
+        prelude::{Emoji, GuildId},
+    },
+    prelude::Context,
+};
 
 fn full_word(string: &str, targets: &[&str]) -> i32 {
-    let words = string.split_whitespace();
-    let mut count = 0;
-    for word in words {
-        for target in targets {
-            if word.eq_ignore_ascii_case(target) {
-                count += 1;
-            }
+    targets
+        .iter()
+        .filter(|t| string.contains(&t.to_lowercase()))
+        .count()
+        .try_into()
+        .unwrap()
+}
+
+fn endwith(string: &str, targets: &[&str]) -> bool {
+    for target in targets {
+        if string.ends_with(target) {
+            return true;
         }
     }
-    count
+    false
 }
 
 fn present(string: &str, targets: &[&str]) -> bool {
@@ -32,15 +44,12 @@ fn choose<'a>(choices: &[&'a str]) -> &'a str {
 }
 
 async fn find_emoji(ctx: &Context, guild_id: Option<GuildId>, name: &str) -> Option<Emoji> {
-    if guild_id.is_none() {return None }
+    guild_id?;
     let emojis = match guild_id.unwrap().emojis(&ctx.http).await {
         Ok(e) => e,
         Err(_) => return None,
     };
-    match emojis.iter().find(|e| e.name == name) {
-        Some(e) => Some(e.clone()),
-        None => None,
-    }
+    emojis.iter().find(|e| e.name == name).cloned()
 }
 
 async fn emoji_or(ctx: &Context, guild_id: Option<GuildId>, name: &str) -> String {
@@ -48,6 +57,10 @@ async fn emoji_or(ctx: &Context, guild_id: Option<GuildId>, name: &str) -> Strin
         Some(emoji) => format!("{emoji}"),
         None => String::from(name),
     }
+}
+
+fn bot(message: &str) -> bool {
+    present(message, &consts::BOT)
 }
 
 pub async fn handle_reaction(ctx: &Context, msg: &Message) -> String {
@@ -62,7 +75,7 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> String {
     };
 
     // bonjour bot
-    if present(&user_message, &consts::BOT) && present(&user_message, &consts::SALUTATIONS) {
+    if bot(&user_message) && present(&user_message, &consts::SALUTATIONS) {
         return format!("{} {} !", choose(&consts::SALUTATIONS), user_nick);
     }
 
@@ -78,7 +91,7 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> String {
 
     // civ bedge
     if present(&user_message, &consts::ATTENDRE)
-    && present(&user_message, &["civ"])
+        && present(&user_message, &["civ"])
         && present(&user_message, &["Thomas"])
     {
         return emoji_or(ctx, msg.guild_id, "Bedge").await;
@@ -86,7 +99,41 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> String {
 
     // cum
     if present(&user_message, &consts::CUM) {
-        return format!(":milk:");
+        return ":milk:".to_owned();
+    }
+
+    // source
+    if present(&user_message, &consts::SOURCE) {
+        return "Ça m'est apparu dans un rêve".to_owned();
+    }
+
+    // pas mal non
+    if present(&user_message, &["pas mal non"]) {
+        return "C'est français :flag_fr:".to_owned();
+    }
+
+    // quoi
+    if endwith(&user_message, &consts::QUOI) {
+        return choose(&consts::QUOI_REPONSE).to_owned();
+    }
+
+    // good bot
+    if bot(&user_message) && present(&user_message, &consts::GOOD) {
+        return choose(&consts::GOOD_REACTION).to_owned();
+    }
+
+    // bad bot
+    if bot(&user_message) && present(&user_message, &consts::BAD) {
+        let reaction = choose(&consts::BAD_REACTION);
+        match reaction {
+            ":nerd:" => return nerd::run(&user_message),
+            _ => return reaction.to_owned(),
+        }
+    }
+
+    // gay bot
+    if bot(&user_message) && present(&user_message, &["gay"]) {
+        return choose(&consts::HOT).to_owned();
     }
 
     String::from("")

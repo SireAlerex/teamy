@@ -10,6 +10,35 @@ pub static SUS: [&str; 2] = ["sus", "sussy"];
 
 pub static CUM: [&str; 3] = ["cum", "cummies", "cummy"];
 
+pub static SOURCE: [&str; 2] = ["source ?", "sources ?"];
+
+pub static QUOI: [&str; 2] = ["quoi", "quoi ?"];
+
+pub static QUOI_REPONSE: [&str; 2] = ["quoicoubeh", "feur"];
+
+pub static GOOD: [&str; 4] = ["bon", "good", "gentil", "nice"];
+
+pub static GOOD_REACTION: [&str; 5] = [
+    ":smiley:",
+    ":smile:",
+    ":grin:",
+    ":blush:",
+    ":smiling_face_with_3_hearts:",
+];
+
+pub static BAD: [&str; 3] = ["bad", "mauvais", "méchant"];
+
+pub static BAD_REACTION: [&str; 6] = [
+    ":nerd:",
+    ":pensive:",
+    ":worried:",
+    ":slight_frown:",
+    ":frowning2:",
+    ":cry:",
+];
+
+pub static HOT: [&str; 2] = [":hot_face:", ":shushing_face:"];
+
 pub static GAME_POOL: [&str; 8] = [
     "LoL avec les boys",
     "Deep Rock Galactic avec les boys",
