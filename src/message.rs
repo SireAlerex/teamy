@@ -63,6 +63,17 @@ fn bot(message: &str) -> bool {
     present(message, &consts::BOT)
 }
 
+fn ou(message: &str) -> Option<&str> {
+    let options : Vec<&str> = message.split(" ou ").collect();
+    let re = match regex::Regex::new(r"bot|robot|teamy") {
+        Ok(r) => r,
+        Err(_) => return None,
+    };
+    let a = re.split(options[0]).last()?;
+    let b = re.split(options[1]).next()?;
+    Some(choose(&[a, b]))
+}
+
 pub async fn handle_reaction(ctx: &Context, msg: &Message) -> String {
     let user_message = msg.content.to_lowercase();
     let user = msg.author.clone();
@@ -136,5 +147,10 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> String {
         return choose(&consts::HOT).to_owned();
     }
 
-    String::from("")
+    // ou
+    if bot(&user_message) && present(&user_message, &["ou"]) {
+        return ou(&user_message).unwrap_or("").to_owned();
+    }
+
+    String::new()
 }

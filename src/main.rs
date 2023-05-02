@@ -60,10 +60,10 @@ impl EventHandler for Bot {
             return;
         }
         let x = match utils::first_letter(&msg.content) {
-            '$' => "".to_owned(), // do nothing if command
+            '$' => String::new(), // do nothing if command
             _ => message::handle_reaction(&ctx, &msg).await,
         };
-        if x.as_str() != "" {
+        if !x.is_empty() {
             let _ = msg.channel_id.say(&ctx.http, x).await;
         }
     }
