@@ -93,17 +93,17 @@ impl EventHandler for Bot {
         }
 
         let data = ctx.data.read().await;
-        let test_guild_id = match data.get::<GuildIdContainer>() {
+        let guild_id = match data.get::<GuildIdContainer>() {
             Some(id) => id,
             None => {
-                error!("There was a problem getting the test guild id");
+                error!("There was a problem getting the guild id");
                 return;
             }
         }
         .lock()
         .await;
 
-        let commands = GuildId::set_application_commands(&test_guild_id, &ctx.http, |commands| {
+        let commands = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
             commands
                 .create_application_command(|command| commands::bonjour::register(command))
                 .create_application_command(|command| commands::slide::register(command))
@@ -271,19 +271,19 @@ async fn serenity(
         .await
         .expect("Error creating client");
 
-    let test_guild_id = if let Some(id) = secret_store.get("TEST_GUILD_ID") {
+    let guild_id = if let Some(id) = secret_store.get("GUILD_ID") {
         id
     } else {
-        return Err(anyhow!("'TEST_GUILD_ID' was not found").into());
+        return Err(anyhow!("'GUILD_ID' was not found").into());
     };
-    let test_guild_id = Arc::new(tokio::sync::Mutex::new(GuildId(
-        test_guild_id.parse().expect("GUILD_ID should be u64"),
+    let guild_id = Arc::new(tokio::sync::Mutex::new(GuildId(
+        guild_id.parse().expect("GUILD_ID should be u64"),
     )));
 
     {
         let mut data = client.data.write().await;
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
-        data.insert::<GuildIdContainer>(Arc::clone(&test_guild_id));
+        data.insert::<GuildIdContainer>(Arc::clone(&guild_id));
     }
 
     Ok(client.into())

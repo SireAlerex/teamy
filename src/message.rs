@@ -4,7 +4,7 @@ use rand::seq::SliceRandom;
 use serenity::{
     model::{
         channel::Message,
-        prelude::{Emoji, GuildId},
+        prelude::{Emoji, GuildId, ReactionType},
     },
     prelude::Context,
 };
@@ -85,6 +85,21 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> String {
         },
     };
 
+    // emoji reactions
+    // pirate
+    if present(&user_message, &["belle bite"]) {
+        let pirate = ReactionType::try_from("🏴‍☠️").unwrap();
+        let crossed_swords = ReactionType::try_from("⚔️").unwrap();
+        let _ = msg.react(&ctx.http,pirate).await;
+        let _ = msg.react(&ctx.http,crossed_swords).await;
+    }
+
+    // bengala
+    if present(&user_message, &["bengala"]) {
+        let _ = msg.react(&ctx.http,'🍆').await;
+    }
+
+    // string reactions
     // bonjour bot
     if bot(&user_message) && present(&user_message, &consts::SALUTATIONS) {
         return format!("{} {} !", choose(&consts::SALUTATIONS), user_nick);
@@ -105,7 +120,7 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> String {
         && present(&user_message, &["civ"])
         && present(&user_message, &["Thomas"])
     {
-        return emoji_or(ctx, msg.guild_id, "Bedge").await;
+        return emoji_or(ctx, msg.guild_id, "nerd").await;
     }
 
     // cum
