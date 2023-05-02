@@ -64,7 +64,7 @@ fn bot(message: &str) -> bool {
 }
 
 fn ou(message: &str) -> Option<&str> {
-    let options : Vec<&str> = message.split(" ou ").collect();
+    let options: Vec<&str> = message.split(" ou ").collect();
     let re = match regex::Regex::new(r"bot|robot|teamy") {
         Ok(r) => r,
         Err(_) => return None,
@@ -90,13 +90,13 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> String {
     if present(&user_message, &["belle bite"]) {
         let pirate = ReactionType::try_from("🏴‍☠️").unwrap();
         let crossed_swords = ReactionType::try_from("⚔️").unwrap();
-        let _ = msg.react(&ctx.http,pirate).await;
-        let _ = msg.react(&ctx.http,crossed_swords).await;
+        let _ = msg.react(&ctx.http, pirate).await;
+        let _ = msg.react(&ctx.http, crossed_swords).await;
     }
 
     // bengala
     if present(&user_message, &["bengala"]) {
-        let _ = msg.react(&ctx.http,'🍆').await;
+        let _ = msg.react(&ctx.http, '🍆').await;
     }
 
     // string reactions

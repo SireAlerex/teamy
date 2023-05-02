@@ -26,7 +26,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info};
 
-use crate::commands::{bonjour::*, id::*, nerd::*, ping::*, roll::*, slide::*};
+use crate::commands::{based::*, bonjour::*, id::*, nerd::*, ping::*, roll::*, slide::*};
 
 struct ShardManagerContainer;
 
@@ -113,6 +113,8 @@ impl EventHandler for Bot {
                 .create_application_command(|command| commands::id::register_user(command))
                 .create_application_command(|command| commands::id::register_chat_input(command))
                 .create_application_command(|command| commands::roll::register(command))
+                .create_application_command(|command| commands::based::register_chat_input(command))
+                .create_application_command(|command| commands::based::register_message(command))
         })
         .await;
 
@@ -152,6 +154,10 @@ impl EventHandler for Bot {
                         content: commands::roll::run_chat_input(&command.data.options),
                         ephemeral: false,
                     }),
+                    "basé" => InteractionResponse::Message(InteractionMessage {
+                        content: commands::based::run_chat_input(&command.data.options),
+                        ephemeral: false,
+                    }),
                     _ => InteractionResponse::Message(InteractionMessage {
                         content: format!("Unkown command ChatInput : {}", command.data.name),
                         ephemeral: true,
@@ -160,6 +166,10 @@ impl EventHandler for Bot {
                 CommandType::Message => match command.data.name.as_str() {
                     "nerd" => InteractionResponse::Message(InteractionMessage {
                         content: commands::nerd::run_message(&ctx, &command).await,
+                        ephemeral: false,
+                    }),
+                    "basé" => InteractionResponse::Message(InteractionMessage {
+                        content: commands::based::run_message(&ctx, &command).await,
                         ephemeral: false,
                     }),
                     _ => InteractionResponse::Message(InteractionMessage {
@@ -199,7 +209,7 @@ impl EventHandler for Bot {
 }
 
 #[group]
-#[commands(bonjour, ping, slide, nerd, id, roll)]
+#[commands(basé, bonjour, ping, slide, nerd, id, roll)]
 struct General;
 
 #[help]
