@@ -1,4 +1,5 @@
 use crate::consts;
+use crate::{InteractionMessage, InteractionResponse};
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use serenity::builder::CreateApplicationCommand;
@@ -11,12 +12,12 @@ use serenity::prelude::Context;
 #[command]
 #[description = "Dis bonjour"]
 async fn bonjour(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.channel_id.say(&ctx.http, run()).await?;
+    msg.channel_id.say(&ctx.http, salutation()).await?;
 
     Ok(())
 }
 
-pub fn run() -> String {
+fn salutation() -> String {
     format!(
         "{} !",
         consts::SALUTATIONS
@@ -24,6 +25,14 @@ pub fn run() -> String {
             .choose(&mut thread_rng())
             .unwrap()
     )
+}
+
+pub fn run() -> InteractionResponse {
+    InteractionResponse::Message(InteractionMessage {
+        content: salutation(),
+        ephemeral: false,
+        embed: None,
+    })
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

@@ -1,3 +1,4 @@
+use crate::{InteractionMessage, InteractionResponse};
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::command::CommandOptionType;
@@ -31,25 +32,35 @@ pub async fn id(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     Ok(())
 }
 
-pub async fn run_user(ctx: &Context, command: &ApplicationCommandInteraction) -> String {
-    if let Some(target_id) = command.data.target_id {
-        if let Ok(user) = target_id.to_user_id().to_user(&ctx.http).await {
-            format!("L'id de {} est {}", user.tag(), target_id)
-        } else {
-            format!("L'id de l'utilisateur est {}", target_id)
-        }
-    } else {
-        "Pas de TargetId dans l'interaction".to_string()
-    }
+pub async fn run_user(
+    ctx: &Context,
+    command: &ApplicationCommandInteraction,
+) -> InteractionResponse {
+    let result = match command.data.target_id {
+        Some(target_id) => match target_id.to_user_id().to_user(&ctx.http).await {
+            Ok(user) => format!("L'id de {} est {}", user.tag(), target_id),
+            Err(e) => format!("Erreur avec l'id {} : {}", target_id, e),
+        },
+        None => String::from("Pas de TargetId dans l'interaction"),
+    };
+    InteractionResponse::Message(InteractionMessage {
+        content: result,
+        ephemeral: false,
+        embed: None,
+    })
 }
 
-pub fn run_chat_input(options: &[CommandDataOption]) -> String {
+pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
     let option = options.get(0).unwrap().resolved.as_ref().unwrap();
-    if let CommandDataOptionValue::User(user, _member) = option {
-        format!("L'id de {} est {}", user.tag(), user.id)
-    } else {
-        "L'utilisateur n'a pas pu être trouvé".to_string()
-    }
+    let result = match option {
+        CommandDataOptionValue::User(user, _) => format!("L'id de {} est {}", user.tag(), user.id),
+        _ => String::from("L'utilisateur n'a pas pu être trouvé"),
+    };
+    InteractionResponse::Message(InteractionMessage {
+        content: result,
+        ephemeral: false,
+        embed: None,
+    })
 }
 
 pub fn register_user(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

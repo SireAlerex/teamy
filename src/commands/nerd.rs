@@ -1,4 +1,5 @@
 use crate::utils;
+use crate::{InteractionMessage, InteractionResponse};
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::command::CommandOptionType;
@@ -24,7 +25,7 @@ pub fn run(text: &str) -> String {
     format!("\"{} :nerd:\"", utils::nerdify(text))
 }
 
-pub fn run_chat_input(options: &[CommandDataOption]) -> String {
+pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
     let option = options
         .get(0)
         .unwrap()
@@ -34,23 +35,32 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> String {
         .as_str()
         .unwrap();
 
-    run(option)
+    InteractionResponse::Message(InteractionMessage {
+        content: run(option),
+        ephemeral: false,
+        embed: None,
+    })
 }
 
-pub async fn run_message(ctx: &Context, command: &ApplicationCommandInteraction) -> String {
-    if let Some(target_id) = command.data.target_id {
-        let message_id = target_id.to_message_id();
-        if let Ok(message) = command.channel_id.message(&ctx.http, message_id).await {
-            format!("{} -{}", run(&message.content), message.author.name)
-        } else {
-            format!(
-                "Erreur pour trouver le message correspondant à {}",
-                message_id
-            )
+pub async fn run_message(
+    ctx: &Context,
+    command: &ApplicationCommandInteraction,
+) -> InteractionResponse {
+    let result = match command.data.target_id {
+        Some(target_id) => {
+            let message_id = target_id.to_message_id();
+            match command.channel_id.message(&ctx.http, message_id).await {
+                Ok(message) => format!("{} -{}", run(&message.content), message.author.name),
+                Err(e) => format!("Erreur pour trouver le message ({}) : {}", message_id, e),
+            }
         }
-    } else {
-        "Erreur pour accéder au MessageId de l'interaction".to_string()
-    }
+        None => String::from("Erreur pour accéder au MessageId de l'interaction"),
+    };
+    InteractionResponse::Message(InteractionMessage {
+        content: result,
+        ephemeral: false,
+        embed: None,
+    })
 }
 
 pub fn register_message(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

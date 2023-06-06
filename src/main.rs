@@ -1,3 +1,4 @@
+pub mod command;
 mod commands;
 pub mod consts;
 mod loops;
@@ -6,6 +7,7 @@ pub mod utils;
 
 use anyhow::anyhow;
 use serenity::async_trait;
+use serenity::builder::CreateEmbed;
 use serenity::client::bridge::gateway::ShardManager;
 use serenity::framework::standard::macros::{group, help, hook};
 use serenity::framework::standard::{
@@ -13,11 +15,12 @@ use serenity::framework::standard::{
 };
 use serenity::framework::StandardFramework;
 use serenity::http::Http;
+use serenity::model::application::command::Command;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::model::prelude::command::CommandType;
 use serenity::model::prelude::interaction::Interaction;
-use serenity::model::prelude::{GuildId, UserId};
+use serenity::model::prelude::{ChannelId, GuildId, UserId};
 use serenity::prelude::*;
 use shuttle_secrets::SecretStore;
 use std::collections::HashSet;
@@ -26,6 +29,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info};
 
+use crate::command::{CommandGroupInfo, CommandGroups, CommandGroupsContainer, CommandInfo};
 use crate::commands::{based::*, bonjour::*, id::*, nerd::*, ping::*, roll::*, slide::*};
 
 struct ShardManagerContainer;
@@ -40,13 +44,20 @@ impl TypeMapKey for GuildIdContainer {
     type Value = Arc<tokio::sync::Mutex<GuildId>>;
 }
 
-struct InteractionMessage {
-    content: String,
-    ephemeral: bool,
+struct LogChanIdContainer;
+
+impl TypeMapKey for LogChanIdContainer {
+    type Value = Arc<tokio::sync::Mutex<ChannelId>>;
 }
 
-enum InteractionResponse {
+pub enum InteractionResponse {
     Message(InteractionMessage),
+}
+
+pub struct InteractionMessage {
+    content: String,
+    ephemeral: bool,
+    embed: Option<CreateEmbed>,
 }
 
 struct Bot {
@@ -105,6 +116,7 @@ impl EventHandler for Bot {
 
         let commands = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
             commands
+                .create_application_command(|command| commands::help::register(command))
                 .create_application_command(|command| commands::bonjour::register(command))
                 .create_application_command(|command| commands::slide::register(command))
                 .create_application_command(|command| commands::ping::register(command))
@@ -124,72 +136,70 @@ impl EventHandler for Bot {
         } else {
             info!("Commands Error !");
         }
+
+        let global_commands = Command::set_global_application_commands(&ctx.http, |command| {
+            command
+                .create_application_command(|command| commands::help::register(command))
+                .create_application_command(|command| commands::bonjour::register(command))
+                .create_application_command(|command| commands::slide::register(command))
+                .create_application_command(|command| commands::ping::register(command))
+                .create_application_command(|command| commands::nerd::register_chat_input(command))
+                .create_application_command(|command| commands::nerd::register_message(command))
+                .create_application_command(|command| commands::id::register_user(command))
+                .create_application_command(|command| commands::id::register_chat_input(command))
+                .create_application_command(|command| commands::roll::register(command))
+                .create_application_command(|command| commands::based::register_chat_input(command))
+                .create_application_command(|command| commands::based::register_message(command))
+        })
+        .await;
+
+        info!("I have the following commands : {:#?}", global_commands);
+        if global_commands.is_ok() {
+            info!("Commands Ok !");
+        } else {
+            info!("Commands Error !");
+        }
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
             let result: InteractionResponse = match command.data.kind {
                 CommandType::ChatInput => match command.data.name.as_str() {
-                    "bonjour" => InteractionResponse::Message(InteractionMessage {
-                        content: commands::bonjour::run(),
-                        ephemeral: false,
-                    }),
-                    "slide" => InteractionResponse::Message(InteractionMessage {
-                        content: commands::slide::run(&ctx, &command).await,
-                        ephemeral: true,
-                    }),
-                    "ping" => InteractionResponse::Message(InteractionMessage {
-                        content: commands::ping::run(&ctx).await,
-                        ephemeral: false,
-                    }),
-                    "nerd" => InteractionResponse::Message(InteractionMessage {
-                        content: commands::nerd::run_chat_input(&command.data.options),
-                        ephemeral: false,
-                    }),
-                    "id" => InteractionResponse::Message(InteractionMessage {
-                        content: commands::id::run_chat_input(&command.data.options),
-                        ephemeral: false,
-                    }),
-                    "roll" => InteractionResponse::Message(InteractionMessage {
-                        content: commands::roll::run_chat_input(&command.data.options),
-                        ephemeral: false,
-                    }),
-                    "basé" => InteractionResponse::Message(InteractionMessage {
-                        content: commands::based::run_chat_input(&command.data.options),
-                        ephemeral: false,
-                    }),
+                    "help" => commands::help::run(&ctx, &command).await,
+                    "bonjour" => commands::bonjour::run(),
+                    "slide" => commands::slide::run(&ctx, &command).await,
+                    "ping" => commands::ping::run(&ctx).await,
+                    "nerd" => commands::nerd::run_chat_input(&command.data.options),
+                    "id" => commands::id::run_chat_input(&command.data.options),
+                    "roll" => commands::roll::run_chat_input(&command.data.options),
+                    "basé" => commands::based::run_chat_input(&command.data.options),
                     _ => InteractionResponse::Message(InteractionMessage {
                         content: format!("Unkown command ChatInput : {}", command.data.name),
                         ephemeral: true,
+                        embed: None,
                     }),
                 },
                 CommandType::Message => match command.data.name.as_str() {
-                    "nerd" => InteractionResponse::Message(InteractionMessage {
-                        content: commands::nerd::run_message(&ctx, &command).await,
-                        ephemeral: false,
-                    }),
-                    "basé" => InteractionResponse::Message(InteractionMessage {
-                        content: commands::based::run_message(&ctx, &command).await,
-                        ephemeral: false,
-                    }),
+                    "nerd" => commands::nerd::run_message(&ctx, &command).await,
+                    "basé" => commands::based::run_message(&ctx, &command).await,
                     _ => InteractionResponse::Message(InteractionMessage {
                         content: format!("Unkown command Message : {}", command.data.name),
                         ephemeral: true,
+                        embed: None,
                     }),
                 },
                 CommandType::User => match command.data.name.as_str() {
-                    "id" => InteractionResponse::Message(InteractionMessage {
-                        content: commands::id::run_user(&ctx, &command).await,
-                        ephemeral: false,
-                    }),
+                    "id" => commands::id::run_user(&ctx, &command).await,
                     _ => InteractionResponse::Message(InteractionMessage {
                         content: format!("Unkown command User : {}", command.data.name),
                         ephemeral: true,
+                        embed: None,
                     }),
                 },
                 _ => InteractionResponse::Message(InteractionMessage {
                     content: "Unkown data kind".to_owned(),
                     ephemeral: true,
+                    embed: None,
                 }),
             };
 
@@ -200,6 +210,7 @@ impl EventHandler for Bot {
                         &command,
                         interaction.content,
                         interaction.ephemeral,
+                        interaction.embed,
                     )
                     .await
                 }
@@ -268,6 +279,28 @@ async fn serenity(
         .help(&MY_HELP)
         .group(&GENERAL_GROUP);
 
+    let static_groups = vec![&GENERAL_GROUP];
+    let mut groups: Vec<CommandGroupInfo> = Vec::default();
+    for group in static_groups {
+        info!("Groupe : {}", group.name);
+        let mut commands: Vec<CommandInfo> = Vec::default();
+        for command in group.options.commands {
+            let x = CommandInfo {
+                names: command.options.names,
+                desc: command.options.desc,
+                usage: command.options.usage,
+                examples: command.options.examples,
+            };
+            info!("commande : {:?}", x);
+            commands.push(x);
+        }
+        groups.push(CommandGroupInfo {
+            name: group.name,
+            commands,
+        });
+    }
+    let groups: CommandGroups = CommandGroups { groups };
+
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT
@@ -290,10 +323,21 @@ async fn serenity(
         guild_id.parse().expect("GUILD_ID should be u64"),
     )));
 
+    let log_chan_id = if let Some(id) = secret_store.get("LOG_CHAN_ID") {
+        id
+    } else {
+        return Err(anyhow!("'LOG_CHAN_ID' was not found").into());
+    };
+    let log_chan_id = Arc::new(tokio::sync::Mutex::new(ChannelId(
+        log_chan_id.parse().expect("LOG_CHAN_ID should be u64"),
+    )));
+
     {
         let mut data = client.data.write().await;
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
         data.insert::<GuildIdContainer>(Arc::clone(&guild_id));
+        data.insert::<LogChanIdContainer>(Arc::clone(&log_chan_id));
+        data.insert::<CommandGroupsContainer>(Arc::new(tokio::sync::Mutex::new(groups)));
     }
 
     Ok(client.into())

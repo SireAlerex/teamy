@@ -1,12 +1,12 @@
 use chrono::prelude::*;
 use rand::{seq::IteratorRandom, thread_rng};
 use serenity::model::prelude::Activity;
-use serenity::{model::prelude::ChannelId, prelude::Context};
+use serenity::prelude::Context;
 use std::sync::Arc;
 use tracing::error;
 
-use crate::consts;
 use crate::utils;
+use crate::{consts, LogChanIdContainer};
 
 pub async fn log_system_load(ctx: Arc<Context>) {
     let time = Local::now().to_rfc2822();
@@ -14,7 +14,18 @@ pub async fn log_system_load(ctx: Arc<Context>) {
     let mem_use = sys_info::mem_info().unwrap();
     let latency = utils::runner_latency(Arc::clone(&ctx)).await;
 
-    let message = ChannelId(1098593646569340968)
+    let data = ctx.data.read().await;
+    let log_chan_id = match data.get::<LogChanIdContainer>() {
+        Some(id) => id,
+        None => {
+            error!("There was a problem getting the log chan id");
+            return;
+        }
+    }
+    .lock()
+    .await;
+
+    let message = log_chan_id
         .send_message(&ctx, |m| {
             m.embed(|e| {
                 e.title("System Resource Load")

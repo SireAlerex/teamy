@@ -1,3 +1,4 @@
+use crate::{InteractionMessage, InteractionResponse};
 use serenity::{
     builder::CreateApplicationCommand,
     framework::standard::{macros::command, CommandResult},
@@ -24,28 +25,38 @@ fn based<'a>() -> &'a str {
     }
 }
 
-pub async fn run_message(ctx: &Context, command: &ApplicationCommandInteraction) -> String {
-    if let Some(target_id) = command.data.target_id {
-        let message_id = target_id.to_message_id();
-        if let Ok(message) = command.channel_id.message(&ctx.http, message_id).await {
-            format!("\"{}\"\n{}", message.content, based())
-        } else {
-            format!(
-                "Erreur pour trouver le message correspondant à {}",
-                message_id
-            )
+pub async fn run_message(
+    ctx: &Context,
+    command: &ApplicationCommandInteraction,
+) -> InteractionResponse {
+    let result = match command.data.target_id {
+        Some(target_id) => {
+            let message_id = target_id.to_message_id();
+            match command.channel_id.message(&ctx.http, message_id).await {
+                Ok(message) => format!("\"{}\"\n{}", message.content, based()),
+                Err(e) => format!("Erreur pour trouver le message ({}) : {}", message_id, e),
+            }
         }
-    } else {
-        "Erreur pour accéder au MessageId de l'interaction".to_string()
-    }
+        None => String::from("Erreur pour accéder au MessageId de l'interaction"),
+    };
+    InteractionResponse::Message(InteractionMessage {
+        content: result,
+        ephemeral: false,
+        embed: None,
+    })
 }
 
-pub fn run_chat_input(options: &[CommandDataOption]) -> String {
-    format!(
+pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
+    let result = format!(
         "\"{}\"\n{}",
         options[0].value.as_ref().unwrap().as_str().unwrap(),
         based()
-    )
+    );
+    InteractionResponse::Message(InteractionMessage {
+        content: result,
+        ephemeral: false,
+        embed: None,
+    })
 }
 
 pub fn register_message(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

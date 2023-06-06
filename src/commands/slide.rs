@@ -1,3 +1,4 @@
+use crate::{InteractionMessage, InteractionResponse};
 use serenity::builder::CreateApplicationCommand;
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::CommandResult;
@@ -14,10 +15,18 @@ async fn slide(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> String {
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
     match command.user.dm(&ctx.http, |m| m.content("Salut !")).await {
-        Ok(_) => "Un DM va être envoyé".to_owned(),
-        Err(e) => format!("Une erreur c'est produite : {e}"),
+        Ok(_) => InteractionResponse::Message(InteractionMessage {
+            content: "Un DM va être envoyé".to_owned(),
+            ephemeral: true,
+            embed: None,
+        }),
+        Err(e) => InteractionResponse::Message(InteractionMessage {
+            content: format!("Une erreur c'est produite : {e}"),
+            ephemeral: true,
+            embed: None,
+        }),
     }
 }
 

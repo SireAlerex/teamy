@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serenity::{
+    builder::CreateEmbed,
     client::bridge::gateway::ShardId,
     gateway::ConnectionStage,
     model::{
@@ -47,6 +48,14 @@ pub fn remove_suffix(s: &str) -> String {
     c.collect()
 }
 
+pub fn strip_prefix_suffix(s: String, c: char) -> String {
+    s.strip_prefix(c)
+        .unwrap()
+        .strip_suffix(c)
+        .unwrap()
+        .to_owned()
+}
+
 pub fn nerdify(text: &str) -> String {
     text.char_indices()
         .map(|(i, c)| {
@@ -64,12 +73,19 @@ pub async fn interaction_response_message(
     command: &ApplicationCommandInteraction,
     text: String,
     ephemeral: bool,
+    embed: Option<CreateEmbed>,
 ) {
     if let Err(why) = command
         .create_interaction_response(&ctx.http, |response| {
             response
                 .kind(InteractionResponseType::ChannelMessageWithSource)
-                .interaction_response_data(|message| message.content(text).ephemeral(ephemeral))
+                .interaction_response_data(|message| {
+                    if let Some(e) = embed {
+                        message.content(text).ephemeral(ephemeral).add_embed(e)
+                    } else {
+                        message.content(text).ephemeral(ephemeral)
+                    }
+                })
         })
         .await
     {

@@ -1,5 +1,4 @@
-use std::cmp::Ordering;
-
+use crate::{InteractionMessage, InteractionResponse};
 use rand::Rng;
 use serenity::builder::CreateApplicationCommand;
 use serenity::framework::standard::macros::command;
@@ -10,6 +9,7 @@ use serenity::model::prelude::interaction::application_command::{
 };
 use serenity::model::prelude::Message;
 use serenity::prelude::Context;
+use std::cmp::Ordering;
 
 #[command]
 #[aliases("r")]
@@ -78,12 +78,12 @@ pub fn run(size: i64, n: i64, modifier: i64) -> String {
     res
 }
 
-pub fn run_chat_input(_options: &[CommandDataOption]) -> String {
+pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
     let mut n = 1;
     let mut size = 0;
     let mut modifier = 0;
 
-    for arg in _options {
+    for arg in options {
         let value = arg.resolved.as_ref().unwrap();
         match arg.name.as_str() {
             "number" => {
@@ -105,7 +105,11 @@ pub fn run_chat_input(_options: &[CommandDataOption]) -> String {
         }
     }
 
-    run(size, n, modifier)
+    InteractionResponse::Message(InteractionMessage {
+        content: run(size, n, modifier),
+        ephemeral: false,
+        embed: None,
+    })
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
