@@ -55,7 +55,7 @@ async fn find_emoji(ctx: &Context, guild_id: Option<GuildId>, name: &str) -> Opt
 async fn emoji_or(ctx: &Context, guild_id: Option<GuildId>, name: &str) -> String {
     match find_emoji(ctx, guild_id, name).await {
         Some(emoji) => format!("{emoji}"),
-        None => String::from(name),
+        None => format!("<veuillez imaginer l'emoji \"{name}\">"),
     }
 }
 
