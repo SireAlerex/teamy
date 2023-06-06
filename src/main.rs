@@ -103,40 +103,6 @@ impl EventHandler for Bot {
             });
         }
 
-        let data = ctx.data.read().await;
-        let guild_id = match data.get::<GuildIdContainer>() {
-            Some(id) => id,
-            None => {
-                error!("There was a problem getting the guild id");
-                return;
-            }
-        }
-        .lock()
-        .await;
-
-        let commands = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
-            commands
-                .create_application_command(|command| commands::help::register(command))
-                .create_application_command(|command| commands::bonjour::register(command))
-                .create_application_command(|command| commands::slide::register(command))
-                .create_application_command(|command| commands::ping::register(command))
-                .create_application_command(|command| commands::nerd::register_chat_input(command))
-                .create_application_command(|command| commands::nerd::register_message(command))
-                .create_application_command(|command| commands::id::register_user(command))
-                .create_application_command(|command| commands::id::register_chat_input(command))
-                .create_application_command(|command| commands::roll::register(command))
-                .create_application_command(|command| commands::based::register_chat_input(command))
-                .create_application_command(|command| commands::based::register_message(command))
-        })
-        .await;
-
-        info!("I have the following commands : {:#?}", commands);
-        if commands.is_ok() {
-            info!("Commands Ok !");
-        } else {
-            info!("Commands Error !");
-        }
-
         let global_commands = Command::set_global_application_commands(&ctx.http, |command| {
             command
                 .create_application_command(|command| commands::help::register(command))
