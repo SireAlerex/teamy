@@ -1,5 +1,6 @@
 use crate::commands::nerd;
 use crate::consts;
+use crate::db;
 use rand::seq::SliceRandom;
 use serenity::{
     model::{
@@ -44,6 +45,7 @@ fn choose<'a>(choices: &[&'a str]) -> &'a str {
 }
 
 async fn find_emoji(ctx: &Context, guild_id: Option<GuildId>, name: &str) -> Option<Emoji> {
+    // None if not in guild
     guild_id?;
     let emojis = match guild_id.unwrap().emojis(&ctx.http).await {
         Ok(e) => e,
@@ -74,9 +76,41 @@ fn ou(message: &str) -> Option<&str> {
     Some(choose(&[a, b]))
 }
 
+// true if is mute and shouldn't react
+async fn mute_checks(ctx: &Context, msg: &Message) -> bool {
+    (msg.guild_id.is_some()
+        && db::is_object_in_coll(
+            ctx,
+            "mute_guilds",
+            &db::Guild::builder(msg.guild_id.unwrap().to_string()),
+        )
+        .await
+        .unwrap_or(false))
+        || db::is_object_in_coll(
+            ctx,
+            "mute_chans",
+            &db::Chan::builder(msg.channel_id.to_string()),
+        )
+        .await
+        .unwrap_or(false)
+        || db::is_object_in_coll(
+            ctx,
+            "mute_users",
+            &db::User::builder(msg.author.id.to_string()),
+        )
+        .await
+        .unwrap_or(false)
+}
+
 pub async fn handle_reaction(ctx: &Context, msg: &Message) -> String {
     let user_message = msg.content.to_lowercase();
     let user = msg.author.clone();
+
+    let checks = mute_checks(ctx, msg).await;
+    if checks {
+        return String::new();
+    }
+
     let user_nick = match msg.is_private() {
         true => user.name,
         false => match user.nick_in(&ctx.http, msg.guild_id.unwrap()).await {

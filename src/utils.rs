@@ -68,6 +68,16 @@ pub fn nerdify(text: &str) -> String {
         .collect()
 }
 
+pub fn admin_command(command: &ApplicationCommandInteraction) -> bool {
+    match command.member.as_ref() {
+        Some(member) => match member.permissions {
+            Some(perm) => perm.administrator(),
+            None => false,
+        },
+        None => false,
+    }
+}
+
 pub async fn interaction_response_message(
     ctx: &Context,
     command: &ApplicationCommandInteraction,

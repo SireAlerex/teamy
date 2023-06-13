@@ -149,6 +149,7 @@ impl EventHandler for Bot {
                     .create_application_command(|command| commands::roll::register(command))
                     .create_application_command(|command| commands::based::register_chat_input(command))
                     .create_application_command(|command| commands::based::register_message(command))
+                    .create_application_command(|command| commands::tg::register(command))
             }).await));
         }
 
@@ -172,6 +173,7 @@ impl EventHandler for Bot {
                     "id" => commands::id::run_chat_input(&command.data.options),
                     "roll" => commands::roll::run_chat_input(&command.data.options),
                     "basé" => commands::based::run_chat_input(&command.data.options),
+                    "tg" => commands::tg::run(&ctx, &command).await,
                     _ => InteractionResponse::Message(InteractionMessage {
                         content: format!("Unkown command ChatInput : {}", command.data.name),
                         ephemeral: true,
