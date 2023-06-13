@@ -1,6 +1,7 @@
 pub mod command;
 mod commands;
 pub mod consts;
+pub mod db;
 mod loops;
 mod message;
 pub mod utils;
@@ -38,16 +39,30 @@ impl TypeMapKey for ShardManagerContainer {
     type Value = Arc<tokio::sync::Mutex<ShardManager>>;
 }
 
+struct GuildGroup {
+    guilds: Vec<GuildId>
+}
+
 struct GuildIdContainer;
 
 impl TypeMapKey for GuildIdContainer {
-    type Value = Arc<tokio::sync::Mutex<GuildId>>;
+    type Value = Arc<tokio::sync::Mutex<GuildGroup>>;
 }
 
 struct LogChanIdContainer;
 
 impl TypeMapKey for LogChanIdContainer {
     type Value = Arc<tokio::sync::Mutex<ChannelId>>;
+}
+
+struct DatabaseUri {
+    db_uri: String,
+}
+
+struct DatabaseUriContainer;
+
+impl TypeMapKey for DatabaseUriContainer {
+    type Value = Arc<tokio::sync::Mutex<DatabaseUri>>;
 }
 
 pub enum InteractionResponse {
@@ -103,27 +118,45 @@ impl EventHandler for Bot {
             });
         }
 
-        let global_commands = Command::set_global_application_commands(&ctx.http, |command| {
-            command
-                .create_application_command(|command| commands::help::register(command))
-                .create_application_command(|command| commands::bonjour::register(command))
-                .create_application_command(|command| commands::slide::register(command))
-                .create_application_command(|command| commands::ping::register(command))
-                .create_application_command(|command| commands::nerd::register_chat_input(command))
-                .create_application_command(|command| commands::nerd::register_message(command))
-                .create_application_command(|command| commands::id::register_user(command))
-                .create_application_command(|command| commands::id::register_chat_input(command))
-                .create_application_command(|command| commands::roll::register(command))
-                .create_application_command(|command| commands::based::register_chat_input(command))
-                .create_application_command(|command| commands::based::register_message(command))
-        })
+        // clean global commands
+        for command in Command::get_global_application_commands(&ctx.http).await.unwrap() {
+            let _ = Command::delete_global_application_command(&ctx.http, command.id).await;
+        };
+
+        let data = ctx.data.read().await;
+        let guild_group = match data.get::<GuildIdContainer>() {
+            Some(guild_group) => guild_group,
+            None => {
+                error!("There was a problem getting the guild id");
+                return;
+            }
+        }
+        .lock()
         .await;
 
-        info!("I have the following commands : {:#?}", global_commands);
-        if global_commands.is_ok() {
-            info!("Commands Ok !");
-        } else {
-            info!("Commands Error !");
+        let mut results: Vec<(GuildId, Result<Vec<Command>, serenity::Error>)> = Vec::new();
+        for guild in &guild_group.guilds {
+            results.push((*guild, guild.set_application_commands(&ctx.http, |commands| {
+                commands
+                    .create_application_command(|command| commands::help::register(command))
+                    .create_application_command(|command| commands::bonjour::register(command))
+                    .create_application_command(|command| commands::slide::register(command))
+                    .create_application_command(|command| commands::ping::register(command))
+                    .create_application_command(|command| commands::nerd::register_chat_input(command))
+                    .create_application_command(|command| commands::nerd::register_message(command))
+                    .create_application_command(|command| commands::id::register_user(command))
+                    .create_application_command(|command| commands::id::register_chat_input(command))
+                    .create_application_command(|command| commands::roll::register(command))
+                    .create_application_command(|command| commands::based::register_chat_input(command))
+                    .create_application_command(|command| commands::based::register_message(command))
+            }).await));
+        }
+
+        for res in results {
+            match res.1 {
+                Ok(_) => info!("Guild {} added commands without error", res.0),
+                Err(e) => error!("Guild {} had an error adding commands : {e}", res.0)
+            }
         }
     }
 
@@ -248,7 +281,6 @@ async fn serenity(
     let static_groups = vec![&GENERAL_GROUP];
     let mut groups: Vec<CommandGroupInfo> = Vec::default();
     for group in static_groups {
-        info!("Groupe : {}", group.name);
         let mut commands: Vec<CommandInfo> = Vec::default();
         for command in group.options.commands {
             let x = CommandInfo {
@@ -257,7 +289,6 @@ async fn serenity(
                 usage: command.options.usage,
                 examples: command.options.examples,
             };
-            info!("commande : {:?}", x);
             commands.push(x);
         }
         groups.push(CommandGroupInfo {
@@ -280,14 +311,13 @@ async fn serenity(
         .await
         .expect("Error creating client");
 
-    let guild_id = if let Some(id) = secret_store.get("GUILD_ID") {
-        id
+    let guilds: Vec<GuildId> = if let Some(ids) = secret_store.get("GUILD_ID") {
+        ids.split(',').map(|id_str| GuildId(id_str.parse().expect("guild id should be u64"))).collect()
     } else {
         return Err(anyhow!("'GUILD_ID' was not found").into());
     };
-    let guild_id = Arc::new(tokio::sync::Mutex::new(GuildId(
-        guild_id.parse().expect("GUILD_ID should be u64"),
-    )));
+    
+    let guild_group = GuildGroup { guilds };
 
     let log_chan_id = if let Some(id) = secret_store.get("LOG_CHAN_ID") {
         id
@@ -298,12 +328,20 @@ async fn serenity(
         log_chan_id.parse().expect("LOG_CHAN_ID should be u64"),
     )));
 
+    let db_uri = if let Some(uri) = secret_store.get("DATABASE_URI") {
+        uri
+    } else {
+        return Err(anyhow!("'DATABASE_URI' was not found").into());
+    };
+    let db_uri = Arc::new(tokio::sync::Mutex::new(DatabaseUri { db_uri }));
+
     {
         let mut data = client.data.write().await;
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
-        data.insert::<GuildIdContainer>(Arc::clone(&guild_id));
+        data.insert::<GuildIdContainer>(Arc::new(tokio::sync::Mutex::new(guild_group)));
         data.insert::<LogChanIdContainer>(Arc::clone(&log_chan_id));
         data.insert::<CommandGroupsContainer>(Arc::new(tokio::sync::Mutex::new(groups)));
+        data.insert::<DatabaseUriContainer>(Arc::clone(&db_uri));
     }
 
     Ok(client.into())
