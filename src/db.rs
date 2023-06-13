@@ -10,8 +10,8 @@ use crate::DatabaseUriContainer;
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct User {
-    pub _id: mongodb::bson::oid::ObjectId,
-    pub user_id: String,
+    _id: mongodb::bson::oid::ObjectId,
+    user_id: String,
 }
 
 impl User {
@@ -40,8 +40,8 @@ impl Chan {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct Guild {
-    pub _id: mongodb::bson::oid::ObjectId,
-    pub guild_id: String,
+    _id: mongodb::bson::oid::ObjectId,
+    guild_id: String,
 }
 
 impl Guild {

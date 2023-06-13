@@ -31,7 +31,9 @@ use std::time::Duration;
 use tracing::{error, info};
 
 use crate::command::{CommandGroupInfo, CommandGroups, CommandGroupsContainer, CommandInfo};
-use crate::commands::{based::*, bonjour::*, id::*, nerd::*, ping::*, roll::*, slide::*};
+use crate::commands::general;
+use crate::commands::general::{based::*, bonjour::*, id::*, nerd::*, ping::*, roll::*, slide::*};
+use crate::commands::macros::add::*;
 
 struct ShardManagerContainer;
 
@@ -138,18 +140,18 @@ impl EventHandler for Bot {
         for guild in &guild_group.guilds {
             results.push((*guild, guild.set_application_commands(&ctx.http, |commands| {
                 commands
-                    .create_application_command(|command| commands::help::register(command))
-                    .create_application_command(|command| commands::bonjour::register(command))
-                    .create_application_command(|command| commands::slide::register(command))
-                    .create_application_command(|command| commands::ping::register(command))
-                    .create_application_command(|command| commands::nerd::register_chat_input(command))
-                    .create_application_command(|command| commands::nerd::register_message(command))
-                    .create_application_command(|command| commands::id::register_user(command))
-                    .create_application_command(|command| commands::id::register_chat_input(command))
-                    .create_application_command(|command| commands::roll::register(command))
-                    .create_application_command(|command| commands::based::register_chat_input(command))
-                    .create_application_command(|command| commands::based::register_message(command))
-                    .create_application_command(|command| commands::tg::register(command))
+                    .create_application_command(|command| general::help::register(command))
+                    .create_application_command(|command| general::bonjour::register(command))
+                    .create_application_command(|command| general::slide::register(command))
+                    .create_application_command(|command| general::ping::register(command))
+                    .create_application_command(|command| general::nerd::register_chat_input(command))
+                    .create_application_command(|command| general::nerd::register_message(command))
+                    .create_application_command(|command| general::id::register_user(command))
+                    .create_application_command(|command| general::id::register_chat_input(command))
+                    .create_application_command(|command| general::roll::register(command))
+                    .create_application_command(|command| general::based::register_chat_input(command))
+                    .create_application_command(|command| general::based::register_message(command))
+                    .create_application_command(|command| general::tg::register(command))
             }).await));
         }
 
@@ -165,15 +167,15 @@ impl EventHandler for Bot {
         if let Interaction::ApplicationCommand(command) = interaction {
             let result: InteractionResponse = match command.data.kind {
                 CommandType::ChatInput => match command.data.name.as_str() {
-                    "help" => commands::help::run(&ctx, &command).await,
-                    "bonjour" => commands::bonjour::run(),
-                    "slide" => commands::slide::run(&ctx, &command).await,
-                    "ping" => commands::ping::run(&ctx).await,
-                    "nerd" => commands::nerd::run_chat_input(&command.data.options),
-                    "id" => commands::id::run_chat_input(&command.data.options),
-                    "roll" => commands::roll::run_chat_input(&command.data.options),
-                    "basé" => commands::based::run_chat_input(&command.data.options),
-                    "tg" => commands::tg::run(&ctx, &command).await,
+                    "help" => general::help::run(&ctx, &command).await,
+                    "bonjour" => general::bonjour::run(),
+                    "slide" => general::slide::run(&ctx, &command).await,
+                    "ping" => general::ping::run(&ctx).await,
+                    "nerd" => general::nerd::run_chat_input(&command.data.options),
+                    "id" => general::id::run_chat_input(&command.data.options),
+                    "roll" => general::roll::run_chat_input(&command.data.options),
+                    "basé" => general::based::run_chat_input(&command.data.options),
+                    "tg" => general::tg::run(&ctx, &command).await,
                     _ => InteractionResponse::Message(InteractionMessage {
                         content: format!("Unkown command ChatInput : {}", command.data.name),
                         ephemeral: true,
@@ -181,8 +183,8 @@ impl EventHandler for Bot {
                     }),
                 },
                 CommandType::Message => match command.data.name.as_str() {
-                    "nerd" => commands::nerd::run_message(&ctx, &command).await,
-                    "basé" => commands::based::run_message(&ctx, &command).await,
+                    "nerd" => general::nerd::run_message(&ctx, &command).await,
+                    "basé" => general::based::run_message(&ctx, &command).await,
                     _ => InteractionResponse::Message(InteractionMessage {
                         content: format!("Unkown command Message : {}", command.data.name),
                         ephemeral: true,
@@ -190,7 +192,7 @@ impl EventHandler for Bot {
                     }),
                 },
                 CommandType::User => match command.data.name.as_str() {
-                    "id" => commands::id::run_user(&ctx, &command).await,
+                    "id" => general::id::run_user(&ctx, &command).await,
                     _ => InteractionResponse::Message(InteractionMessage {
                         content: format!("Unkown command User : {}", command.data.name),
                         ephemeral: true,
@@ -219,6 +221,11 @@ impl EventHandler for Bot {
         };
     }
 }
+
+#[group]
+#[prefix = "macro"]
+#[commands(add)]
+struct Macro;
 
 #[group]
 #[commands(basé, bonjour, ping, slide, nerd, id, roll)]
@@ -278,9 +285,10 @@ async fn serenity(
         .configure(|c| c.owners(owners).prefix("$"))
         .after(after)
         .help(&MY_HELP)
-        .group(&GENERAL_GROUP);
+        .group(&GENERAL_GROUP)
+        .group(&MACRO_GROUP);
 
-    let static_groups = vec![&GENERAL_GROUP];
+    let static_groups = vec![&GENERAL_GROUP, &MACRO_GROUP];
     let mut groups: Vec<CommandGroupInfo> = Vec::default();
     for group in static_groups {
         let mut commands: Vec<CommandInfo> = Vec::default();
