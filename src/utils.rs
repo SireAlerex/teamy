@@ -78,6 +78,12 @@ pub fn admin_command(command: &ApplicationCommandInteraction) -> bool {
     }
 }
 
+pub async fn say_or_error(ctx: &Context, channel_id: ChannelId, content: &str) {
+    if let Err(e) = channel_id.say(&ctx.http, content).await {
+        error!("error sending message ({content}) in chan {} : {e}", channel_id);
+    }
+}
+
 pub async fn interaction_response_message(
     ctx: &Context,
     command: &ApplicationCommandInteraction,

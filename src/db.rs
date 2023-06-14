@@ -1,3 +1,4 @@
+use bson::Document;
 use mongodb::bson::doc;
 use mongodb::bson::to_document;
 use mongodb::{
@@ -61,7 +62,7 @@ async fn get_client(ctx: &Context) -> Result<Client, mongodb::error::Error> {
     Client::with_options(options)
 }
 
-async fn get_coll<'a, T: core::fmt::Debug + serde::Deserialize<'a> + serde::Serialize>(
+pub async fn get_coll<'a, T: core::fmt::Debug + serde::Deserialize<'a> + serde::Serialize>(
     ctx: &Context,
     collection: &str,
 ) -> Result<Collection<T>, mongodb::error::Error> {
@@ -203,4 +204,27 @@ pub async fn delete<
             format!("erreur pour accéder à l'objet : {:?}", object),
         )))
     }
+}
+
+pub async fn find_filter<
+T: core::fmt::Debug
+    + serde::de::DeserializeOwned
+    + serde::Serialize
+    + std::marker::Unpin
+    + std::marker::Send
+    + std::marker::Sync,
+>(ctx: &Context, collection: &str, filter: impl Into<Option<Document>>) -> Result<Option<T>, mongodb::error::Error> {
+    get_coll::<T>(ctx, collection).await?.find_one(filter, None).await
+}
+
+pub async fn delete_filter<
+T: core::fmt::Debug
+    + serde::de::DeserializeOwned
+    + serde::Serialize
+    + std::marker::Unpin
+    + std::marker::Send
+    + std::marker::Sync,
+>(ctx: &Context, collection: &str, query: Document) -> Result<(), mongodb::error::Error> {
+    get_coll::<T>(ctx, collection).await?.delete_one(query, None).await?;
+    Ok(())
 }

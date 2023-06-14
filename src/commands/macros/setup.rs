@@ -3,8 +3,21 @@ use serenity::framework::standard::macros::command;
 use serenity::framework::standard::{CommandResult, Args};
 use serenity::model::prelude::command::{CommandType, CommandOptionType};
 use serenity::model::prelude::Message;
+use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
 use serenity::prelude::Context;
 use tracing::info;
+
+use crate::{InteractionResponse, InteractionMessage};
+
+pub fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
+    
+
+    InteractionResponse::Message(InteractionMessage {
+        content: "macro_run".to_string(),
+        ephemeral: true,
+        embed: None,
+    })
+}
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
     command

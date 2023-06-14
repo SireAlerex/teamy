@@ -33,7 +33,8 @@ use tracing::{error, info};
 use crate::command::{CommandGroupInfo, CommandGroups, CommandGroupsContainer, CommandInfo};
 use crate::commands::general;
 use crate::commands::general::{based::*, bonjour::*, id::*, nerd::*, ping::*, roll::*, slide::*};
-use crate::commands::macros::add::*;
+use crate::commands::macros;
+use crate::commands::macros::{add::*, edit::*, del::*, show::*, clear::*};
 
 struct ShardManagerContainer;
 
@@ -89,6 +90,7 @@ impl EventHandler for Bot {
         }
         let x = match utils::first_letter(&msg.content) {
             '$' => String::new(), // do nothing if command
+            '!' => commands::macros::r#macro::handle_macro(&ctx, &msg).await,
             _ => message::handle_reaction(&ctx, &msg).await,
         };
         if !x.is_empty() {
@@ -152,6 +154,7 @@ impl EventHandler for Bot {
                     .create_application_command(|command| general::based::register_chat_input(command))
                     .create_application_command(|command| general::based::register_message(command))
                     .create_application_command(|command| general::tg::register(command))
+                    .create_application_command(|command| macros::setup::register(command))
             }).await));
         }
 
@@ -176,6 +179,7 @@ impl EventHandler for Bot {
                     "roll" => general::roll::run_chat_input(&command.data.options),
                     "basé" => general::based::run_chat_input(&command.data.options),
                     "tg" => general::tg::run(&ctx, &command).await,
+                    "macro" => macros::setup::run(&ctx, &command),
                     _ => InteractionResponse::Message(InteractionMessage {
                         content: format!("Unkown command ChatInput : {}", command.data.name),
                         ephemeral: true,
@@ -224,7 +228,7 @@ impl EventHandler for Bot {
 
 #[group]
 #[prefix = "macro"]
-#[commands(add)]
+#[commands(add, edit, del, show, clear)]
 struct Macro;
 
 #[group]

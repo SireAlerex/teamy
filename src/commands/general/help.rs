@@ -7,7 +7,6 @@ use serenity::{
     prelude::Context,
 };
 use std::sync::Arc;
-use tracing::{error, info};
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
     let data = ctx.data.read().await;
@@ -36,10 +35,6 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         let x = CommandGroups {
             groups: groups.to_vec(),
         };
-        match x.find_command(&arg) {
-            Some(command) => info!("commande trouve : {:?}", command),
-            None => error!("commande non trouvée pour {}", arg),
-        }
         if let Some(search_group) = x.find_group(&arg) {
             let command = search_group.find_command(&arg).unwrap();
             title = command.names[0].to_owned();
