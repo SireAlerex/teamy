@@ -34,7 +34,7 @@ use crate::command::{CommandGroupInfo, CommandGroups, CommandGroupsContainer, Co
 use crate::commands::general;
 use crate::commands::general::{based::*, bonjour::*, id::*, nerd::*, ping::*, roll::*, slide::*};
 use crate::commands::macros;
-use crate::commands::macros::{add::*, edit::*, del::*, show::*, clear::*};
+use crate::commands::macros::{add::*, clear::*, del::*, edit::*, show::*};
 
 struct ShardManagerContainer;
 
@@ -43,7 +43,7 @@ impl TypeMapKey for ShardManagerContainer {
 }
 
 struct GuildGroup {
-    guilds: Vec<GuildId>
+    guilds: Vec<GuildId>,
 }
 
 struct GuildIdContainer;
@@ -68,6 +68,12 @@ impl TypeMapKey for DatabaseUriContainer {
     type Value = Arc<tokio::sync::Mutex<DatabaseUri>>;
 }
 
+struct TempChanContainer;
+
+impl TypeMapKey for TempChanContainer {
+    type Value = Arc<tokio::sync::Mutex<ChannelId>>;
+}
+
 pub enum InteractionResponse {
     Message(InteractionMessage),
 }
@@ -88,14 +94,12 @@ impl EventHandler for Bot {
         if msg.author.bot {
             return;
         }
-        let x = match utils::first_letter(&msg.content) {
+        let content = match utils::first_letter(&msg.content) {
             '$' => String::new(), // do nothing if command
             '!' => commands::macros::r#macro::handle_macro(&ctx, &msg).await,
             _ => message::handle_reaction(&ctx, &msg).await,
         };
-        if !x.is_empty() {
-            let _ = msg.channel_id.say(&ctx.http, x).await;
-        }
+        utils::say_or_error(&ctx, msg.channel_id, &content).await;
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
@@ -123,9 +127,12 @@ impl EventHandler for Bot {
         }
 
         // clean global commands
-        for command in Command::get_global_application_commands(&ctx.http).await.unwrap() {
+        for command in Command::get_global_application_commands(&ctx.http)
+            .await
+            .unwrap()
+        {
             let _ = Command::delete_global_application_command(&ctx.http, command.id).await;
-        };
+        }
 
         let data = ctx.data.read().await;
         let guild_group = match data.get::<GuildIdContainer>() {
@@ -140,28 +147,47 @@ impl EventHandler for Bot {
 
         let mut results: Vec<(GuildId, Result<Vec<Command>, serenity::Error>)> = Vec::new();
         for guild in &guild_group.guilds {
-            results.push((*guild, guild.set_application_commands(&ctx.http, |commands| {
-                commands
-                    .create_application_command(|command| general::help::register(command))
-                    .create_application_command(|command| general::bonjour::register(command))
-                    .create_application_command(|command| general::slide::register(command))
-                    .create_application_command(|command| general::ping::register(command))
-                    .create_application_command(|command| general::nerd::register_chat_input(command))
-                    .create_application_command(|command| general::nerd::register_message(command))
-                    .create_application_command(|command| general::id::register_user(command))
-                    .create_application_command(|command| general::id::register_chat_input(command))
-                    .create_application_command(|command| general::roll::register(command))
-                    .create_application_command(|command| general::based::register_chat_input(command))
-                    .create_application_command(|command| general::based::register_message(command))
-                    .create_application_command(|command| general::tg::register(command))
-                    .create_application_command(|command| macros::setup::register(command))
-            }).await));
+            results.push((
+                *guild,
+                guild
+                    .set_application_commands(&ctx.http, |commands| {
+                        commands
+                            .create_application_command(|command| general::help::register(command))
+                            .create_application_command(|command| {
+                                general::bonjour::register(command)
+                            })
+                            .create_application_command(|command| general::slide::register(command))
+                            .create_application_command(|command| general::ping::register(command))
+                            .create_application_command(|command| {
+                                general::nerd::register_chat_input(command)
+                            })
+                            .create_application_command(|command| {
+                                general::nerd::register_message(command)
+                            })
+                            .create_application_command(|command| {
+                                general::id::register_user(command)
+                            })
+                            .create_application_command(|command| {
+                                general::id::register_chat_input(command)
+                            })
+                            .create_application_command(|command| general::roll::register(command))
+                            .create_application_command(|command| {
+                                general::based::register_chat_input(command)
+                            })
+                            .create_application_command(|command| {
+                                general::based::register_message(command)
+                            })
+                            .create_application_command(|command| general::tg::register(command))
+                            .create_application_command(|command| macros::setup::register(command))
+                    })
+                    .await,
+            ));
         }
 
         for res in results {
             match res.1 {
                 Ok(_) => info!("Guild {} added commands without error", res.0),
-                Err(e) => error!("Guild {} had an error adding commands : {e}", res.0)
+                Err(e) => error!("Guild {} had an error adding commands : {e}", res.0),
             }
         }
     }
@@ -179,7 +205,7 @@ impl EventHandler for Bot {
                     "roll" => general::roll::run_chat_input(&command.data.options),
                     "basé" => general::based::run_chat_input(&command.data.options),
                     "tg" => general::tg::run(&ctx, &command).await,
-                    "macro" => macros::setup::run(&ctx, &command),
+                    "macro" => macros::setup::run(&ctx, &command).await,
                     _ => InteractionResponse::Message(InteractionMessage {
                         content: format!("Unkown command ChatInput : {}", command.data.name),
                         ephemeral: true,
@@ -326,11 +352,13 @@ async fn serenity(
         .expect("Error creating client");
 
     let guilds: Vec<GuildId> = if let Some(ids) = secret_store.get("GUILD_ID") {
-        ids.split(',').map(|id_str| GuildId(id_str.parse().expect("guild id should be u64"))).collect()
+        ids.split(',')
+            .map(|id_str| GuildId(id_str.parse().expect("guild id should be u64")))
+            .collect()
     } else {
         return Err(anyhow!("'GUILD_ID' was not found").into());
     };
-    
+
     let guild_group = GuildGroup { guilds };
 
     let log_chan_id = if let Some(id) = secret_store.get("LOG_CHAN_ID") {
@@ -349,6 +377,13 @@ async fn serenity(
     };
     let db_uri = Arc::new(tokio::sync::Mutex::new(DatabaseUri { db_uri }));
 
+    let temp_chan = if let Some(channel_id) = secret_store.get("TEMP_CHAN") {
+        channel_id
+    } else {
+        return Err(anyhow!("'TEMP_CHAN' was not found").into());
+    };
+    let temp_chan = ChannelId(temp_chan.parse().expect("TEMP_CHAN should be u64"));
+
     {
         let mut data = client.data.write().await;
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
@@ -356,6 +391,7 @@ async fn serenity(
         data.insert::<LogChanIdContainer>(Arc::clone(&log_chan_id));
         data.insert::<CommandGroupsContainer>(Arc::new(tokio::sync::Mutex::new(groups)));
         data.insert::<DatabaseUriContainer>(Arc::clone(&db_uri));
+        data.insert::<TempChanContainer>(Arc::new(tokio::sync::Mutex::new(temp_chan)));
     }
 
     Ok(client.into())

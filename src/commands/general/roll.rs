@@ -2,12 +2,12 @@ use crate::{InteractionMessage, InteractionResponse};
 use rand::Rng;
 use serenity::builder::CreateApplicationCommand;
 use serenity::framework::standard::macros::command;
-use serenity::framework::standard::{Args, CommandResult};
+use serenity::framework::standard::{Args, CommandError, CommandResult};
 use serenity::model::application::command::CommandOptionType;
 use serenity::model::prelude::interaction::application_command::{
     CommandDataOption, CommandDataOptionValue,
 };
-use serenity::model::prelude::Message;
+use serenity::model::prelude::{ChannelId, Message};
 use serenity::prelude::Context;
 use std::cmp::Ordering;
 
@@ -19,6 +19,15 @@ use std::cmp::Ordering;
 #[example = "3d4-1"]
 #[example = "d8"]
 pub async fn roll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
+    roll_intern(ctx, msg.channel_id, args).await?;
+    Ok(())
+}
+
+pub async fn roll_intern(
+    ctx: &Context,
+    channel_id: ChannelId,
+    args: Args,
+) -> Result<Message, CommandError> {
     let d_split: Vec<&str> = args.message().split('d').collect();
     let size;
     let n;
@@ -48,10 +57,8 @@ pub async fn roll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     } else {
         return Err("bad syntax, must be '$roll <x>d<n>+<y>'".into());
     }
-    msg.channel_id
-        .say(&ctx.http, run(size, n, modifier))
-        .await?;
-    Ok(())
+    let x = channel_id.say(&ctx.http, run(size, n, modifier)).await?;
+    Ok(x)
 }
 
 pub fn run(size: i64, n: i64, modifier: i64) -> String {

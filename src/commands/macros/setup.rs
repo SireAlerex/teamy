@@ -1,22 +1,24 @@
 use serenity::builder::CreateApplicationCommand;
-use serenity::framework::standard::macros::command;
-use serenity::framework::standard::{CommandResult, Args};
-use serenity::model::prelude::command::{CommandType, CommandOptionType};
-use serenity::model::prelude::Message;
+use serenity::model::prelude::command::{CommandOptionType, CommandType};
 use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
 use serenity::prelude::Context;
-use tracing::info;
 
-use crate::{InteractionResponse, InteractionMessage};
+use super::{add, clear, del, edit, show};
+use crate::{InteractionMessage, InteractionResponse};
 
-pub fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
-    
-
-    InteractionResponse::Message(InteractionMessage {
-        content: "macro_run".to_string(),
-        ephemeral: true,
-        embed: None,
-    })
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
+    match command.data.options[0].name.as_str() {
+        "add" => add::run(ctx, command).await,
+        "del" => del::run(ctx, command).await,
+        "show" => show::run(ctx, command).await,
+        "edit" => edit::run(),
+        "clear" => clear::run(),
+        _ => InteractionResponse::Message(InteractionMessage {
+            content: "macro_unknown_subcommand".to_string(),
+            ephemeral: true,
+            embed: None,
+        }),
+    }
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
@@ -26,31 +28,59 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
         .kind(CommandType::ChatInput)
         .create_option(|option| {
             option
-                .name("macro_add")
+                .name("add")
                 .description("macro_add_desc")
                 .kind(CommandOptionType::SubCommand)
+                .create_sub_option(|suboption| {
+                    suboption
+                        .name("nom")
+                        .description("nom de la macro")
+                        .kind(CommandOptionType::String)
+                        .required(true)
+                })
+                .create_sub_option(|suboption| {
+                    suboption
+                        .name("commande")
+                        .description("commande de la macro")
+                        .kind(CommandOptionType::String)
+                        .required(true)
+                })
+                .create_sub_option(|suboption| {
+                    suboption
+                        .name("arguments")
+                        .description("arguments de la macro")
+                        .kind(CommandOptionType::String)
+                        .required(false)
+                })
         })
         .create_option(|option| {
             option
-                .name("macro_edit")
+                .name("edit")
                 .description("macro_edit_desc")
                 .kind(CommandOptionType::SubCommand)
         })
         .create_option(|option| {
             option
-                .name("macro_del")
+                .name("del")
                 .description("macro_del_desc")
                 .kind(CommandOptionType::SubCommand)
+                .create_sub_option(|suboption| {
+                    suboption
+                        .name("nom")
+                        .description("nom de la macro")
+                        .kind(CommandOptionType::String)
+                        .required(true)
+                })
         })
         .create_option(|option| {
             option
-                .name("macro_show")
+                .name("show")
                 .description("macro_show_desc")
                 .kind(CommandOptionType::SubCommand)
         })
         .create_option(|option| {
             option
-                .name("macro_clear")
+                .name("clear")
                 .description("macro_clear_desc")
                 .kind(CommandOptionType::SubCommand)
         })

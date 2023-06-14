@@ -2,9 +2,11 @@ use bson::Document;
 use mongodb::bson::doc;
 use mongodb::bson::to_document;
 use mongodb::{
+    error::Error,
     options::{ClientOptions, ResolverConfig},
     Client, Collection,
 };
+use serenity::futures::TryStreamExt;
 use serenity::prelude::Context;
 
 use crate::DatabaseUriContainer;
@@ -54,7 +56,14 @@ impl Guild {
     }
 }
 
-async fn get_client(ctx: &Context) -> Result<Client, mongodb::error::Error> {
+pub fn mongodb_error(message: impl ToString) -> Error {
+    Error::from(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        message.to_string(),
+    ))
+}
+
+async fn get_client(ctx: &Context) -> Result<Client, Error> {
     let data = ctx.data.read().await;
     let db = data.get::<DatabaseUriContainer>().unwrap().lock().await;
     let options =
@@ -65,7 +74,7 @@ async fn get_client(ctx: &Context) -> Result<Client, mongodb::error::Error> {
 pub async fn get_coll<'a, T: core::fmt::Debug + serde::Deserialize<'a> + serde::Serialize>(
     ctx: &Context,
     collection: &str,
-) -> Result<Collection<T>, mongodb::error::Error> {
+) -> Result<Collection<T>, Error> {
     Ok(get_client(ctx)
         .await?
         .database("teamy")
@@ -83,12 +92,32 @@ pub async fn get_object<
     ctx: &Context,
     collection: &str,
     object: &T,
-) -> Result<Option<T>, mongodb::error::Error> {
+) -> Result<Option<T>, Error> {
     let coll: Collection<T> = get_coll(ctx, collection).await?;
     let mut doc_filter = to_document(&object)?;
     doc_filter.remove("_id");
     let o = coll.find_one(doc_filter, None).await?;
     Ok(o)
+}
+
+pub async fn get_objects<
+    T: core::fmt::Debug
+        + serde::de::DeserializeOwned
+        + serde::Serialize
+        + std::marker::Unpin
+        + std::marker::Send
+        + std::marker::Sync,
+>(
+    ctx: &Context,
+    collection: &str,
+    filter: impl Into<Option<Document>>,
+) -> Result<Vec<T>, Error> {
+    get_coll::<T>(ctx, collection)
+        .await?
+        .find(filter, None)
+        .await?
+        .try_collect::<Vec<T>>()
+        .await
 }
 
 pub async fn is_object_in_coll<
@@ -102,7 +131,7 @@ pub async fn is_object_in_coll<
     ctx: &Context,
     collection: &str,
     object: &T,
-) -> Result<bool, mongodb::error::Error> {
+) -> Result<bool, Error> {
     match get_object(ctx, collection, object).await? {
         Some(_) => Ok(true),
         None => Ok(false),
@@ -120,16 +149,13 @@ pub async fn insert<
     ctx: &Context,
     collection: &str,
     object: &T,
-) -> Result<(), mongodb::error::Error> {
+) -> Result<(), Error> {
     let coll: Collection<T> = get_coll(ctx, collection).await?;
     if !is_object_in_coll(ctx, collection, object).await? {
         let _ = coll.insert_one(object, None).await?;
         Ok(())
     } else {
-        Err(mongodb::error::Error::from(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "l'objet à insérer existe déjà",
-        )))
+        Err(mongodb_error("l'objet à insérer existe déjà"))
     }
 }
 
@@ -145,7 +171,7 @@ pub async fn update<
     collection: &str,
     object: &T,
     update: &bson::Document,
-) -> Result<(), mongodb::error::Error> {
+) -> Result<(), Error> {
     let coll: Collection<T> = get_coll(ctx, collection).await?;
     if let Ok(o) = get_object(ctx, collection, object).await {
         match o {
@@ -159,15 +185,12 @@ pub async fn update<
                     .await?;
                 Ok(())
             }
-            None => Err(mongodb::error::Error::from(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "l'objet à modifier n'existe pas",
-            ))),
+            None => Err(mongodb_error("l'objet à modifier n'existe pas")),
         }
     } else {
-        Err(mongodb::error::Error::from(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("erreur pour accéder à l'objet : {:?}", object),
+        Err(mongodb_error(format!(
+            "erreur pour accéder à l'objet : {:?}",
+            object
         )))
     }
 }
@@ -183,7 +206,7 @@ pub async fn delete<
     ctx: &Context,
     collection: &str,
     object: &T,
-) -> Result<(), mongodb::error::Error> {
+) -> Result<(), Error> {
     let coll: Collection<T> = get_coll(ctx, collection).await?;
     if let Ok(o) = get_object(ctx, collection, object).await {
         match o {
@@ -193,38 +216,49 @@ pub async fn delete<
                     .await?;
                 Ok(())
             }
-            None => Err(mongodb::error::Error::from(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "l'objet à modifier n'existe pas",
-            ))),
+            None => Err(mongodb_error("l'objet à supprimer n'existe pas")),
         }
     } else {
-        Err(mongodb::error::Error::from(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("erreur pour accéder à l'objet : {:?}", object),
+        Err(mongodb_error(format!(
+            "erreur pour accéder à l'objet : {:?}",
+            object
         )))
     }
 }
 
 pub async fn find_filter<
-T: core::fmt::Debug
-    + serde::de::DeserializeOwned
-    + serde::Serialize
-    + std::marker::Unpin
-    + std::marker::Send
-    + std::marker::Sync,
->(ctx: &Context, collection: &str, filter: impl Into<Option<Document>>) -> Result<Option<T>, mongodb::error::Error> {
-    get_coll::<T>(ctx, collection).await?.find_one(filter, None).await
+    T: core::fmt::Debug
+        + serde::de::DeserializeOwned
+        + serde::Serialize
+        + std::marker::Unpin
+        + std::marker::Send
+        + std::marker::Sync,
+>(
+    ctx: &Context,
+    collection: &str,
+    filter: impl Into<Option<Document>>,
+) -> Result<Option<T>, Error> {
+    get_coll::<T>(ctx, collection)
+        .await?
+        .find_one(filter, None)
+        .await
 }
 
 pub async fn delete_filter<
-T: core::fmt::Debug
-    + serde::de::DeserializeOwned
-    + serde::Serialize
-    + std::marker::Unpin
-    + std::marker::Send
-    + std::marker::Sync,
->(ctx: &Context, collection: &str, query: Document) -> Result<(), mongodb::error::Error> {
-    get_coll::<T>(ctx, collection).await?.delete_one(query, None).await?;
+    T: core::fmt::Debug
+        + serde::de::DeserializeOwned
+        + serde::Serialize
+        + std::marker::Unpin
+        + std::marker::Send
+        + std::marker::Sync,
+>(
+    ctx: &Context,
+    collection: &str,
+    query: Document,
+) -> Result<(), Error> {
+    get_coll::<T>(ctx, collection)
+        .await?
+        .delete_one(query, None)
+        .await?;
     Ok(())
 }

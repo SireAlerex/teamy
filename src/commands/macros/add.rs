@@ -1,13 +1,11 @@
+use super::r#macro::{test_macro, Macro};
+use crate::{db, utils};
 use crate::{InteractionMessage, InteractionResponse};
-use serenity::builder::CreateApplicationCommand;
 use serenity::framework::standard::macros::command;
-use serenity::framework::standard::{CommandResult, Args};
-use serenity::model::prelude::command::CommandType;
-use serenity::model::prelude::{Message, UserId};
+use serenity::framework::standard::{Args, CommandResult};
+use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
+use serenity::model::prelude::Message;
 use serenity::prelude::Context;
-use super::r#macro::Macro;
-use crate::db;
-use tracing::info;
 
 #[command]
 #[description = "macro_add_desc"]
@@ -15,22 +13,57 @@ async fn add(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let user_id = msg.author.id;
     let name = args.single::<String>()?;
     let command = args.single::<String>()?;
-    let args = if args.len() == 3 { Some(args.single:: <String>()? ) } else { None };
+    let args = if args.len() == 3 {
+        Some(args.single::<String>()?)
+    } else {
+        None
+    };
     add_macro(ctx, user_id.to_string(), name, command, args).await?;
 
+    utils::say_or_error(ctx, msg.channel_id, "La macro a bien été ajoutée").await;
     Ok(())
 }
 
-async fn add_macro(ctx: &Context, user_id: String, name: String, command: String, args: Option<String>) -> Result<(), mongodb::error::Error> {
-    //let args = if args.is_empty() { None } else { Some(args) };
-    let macr = Macro::builder(user_id, name, command, args);
-    db::insert(ctx, "macros", &macr).await
+async fn add_macro(
+    ctx: &Context,
+    user_id: String,
+    name: String,
+    command: String,
+    args: Option<String>,
+) -> CommandResult {
+    test_macro(ctx, &command, &args).await?;
+    db::insert(ctx, "macros", &Macro::builder(user_id, name, command, args)).await?;
+    Ok(())
 }
 
-pub fn run() -> InteractionResponse {
+pub async fn run(
+    ctx: &Context,
+    base_command: &ApplicationCommandInteraction,
+) -> InteractionResponse {
+    let subcommand = &base_command.data.options[0];
+    let name = utils::get_option(subcommand, "nom")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string();
+    let command = utils::get_option(subcommand, "commande")
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string();
+    let args = if let Some(value) = utils::get_option(subcommand, "arguments") {
+        Some(value.as_str().unwrap().to_string())
+    } else {
+        None
+    };
+    let content = match add_macro(ctx, base_command.user.id.to_string(), name, command, args).await
+    {
+        Ok(_) => "La macro a bien été ajoutée".to_string(),
+        Err(e) => format!("Erreur lors de l'ajout de macro : {e}"),
+    };
     InteractionResponse::Message(InteractionMessage {
-        content: "macro_add".to_string(),
-        ephemeral: false,
+        content,
+        ephemeral: true,
         embed: None,
     })
 }

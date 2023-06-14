@@ -4,11 +4,14 @@ use std::time::Duration;
 use serenity::{
     builder::CreateEmbed,
     client::bridge::gateway::ShardId,
+    framework::standard::CommandError,
     gateway::ConnectionStage,
+    json::Value,
     model::{
         prelude::{
             interaction::{
-                application_command::ApplicationCommandInteraction, InteractionResponseType,
+                application_command::{ApplicationCommandInteraction, CommandDataOption},
+                InteractionResponseType,
             },
             ChannelId, Message,
         },
@@ -79,9 +82,40 @@ pub fn admin_command(command: &ApplicationCommandInteraction) -> bool {
 }
 
 pub async fn say_or_error(ctx: &Context, channel_id: ChannelId, content: &str) {
+    if content.is_empty() {
+        return;
+    };
     if let Err(e) = channel_id.say(&ctx.http, content).await {
-        error!("error sending message ({content}) in chan {} : {e}", channel_id);
+        error!(
+            "error sending message ({content}) in chan {} : {e}",
+            channel_id
+        );
     }
+}
+
+pub fn command_error(message: impl ToString) -> CommandError {
+    Box::<dyn std::error::Error + Send + Sync>::from(message.to_string())
+}
+
+pub async fn get_temp_chan(ctx: &Context) -> Option<ChannelId> {
+    let data = ctx.data.read().await;
+    let temp_chan = match data.get::<crate::TempChanContainer>() {
+        Some(chan) => chan,
+        None => {
+            error!("there was a problem getting the temp chan");
+            return None;
+        }
+    };
+    let temp_chan = temp_chan.lock().await;
+    Some(temp_chan.clone())
+}
+
+pub fn get_option<'a>(data: &'a CommandDataOption, name: impl ToString) -> Option<&'a Value> {
+    data.options
+        .iter()
+        .find(|o| o.name == name.to_string())?
+        .value
+        .as_ref()
 }
 
 pub async fn interaction_response_message(

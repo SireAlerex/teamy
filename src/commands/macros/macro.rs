@@ -1,21 +1,27 @@
-use bson::doc;
-use serenity::{model::prelude::Message, prelude::Context, framework::standard::Args};
-use tracing::{info, error};
-use crate::{db, utils};
 use crate::commands::general::roll;
+use crate::{db, utils};
+use bson::doc;
+use serenity::framework::standard::CommandError;
+use serenity::{framework::standard::Args, model::prelude::Message, prelude::Context};
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct Macro {
     _id: mongodb::bson::oid::ObjectId,
     user_id: String,
-    name: String,
-    command: String,
-    args: Option<String>,
+    pub name: String,
+    pub command: String,
+    pub args: Option<String>,
 }
 
 impl Macro {
     pub fn builder(user_id: String, name: String, command: String, args: Option<String>) -> Macro {
-        Macro { _id: mongodb::bson::oid::ObjectId::new(), user_id, name, command, args }
+        Macro {
+            _id: mongodb::bson::oid::ObjectId::new(),
+            user_id,
+            name,
+            command,
+            args,
+        }
     }
 }
 
@@ -24,18 +30,49 @@ pub async fn handle_macro(ctx: &Context, msg: &Message) -> String {
     let filter = doc! {"user_id": msg.author.id.to_string(), "name": name};
     if let Ok(res) = db::find_filter::<Macro>(ctx, "macros", filter).await {
         match res {
-            Some(macr) => {
-                let x = macr.args.unwrap();
-                match roll::roll(ctx, msg, Args::new(&x, &[])).await {
-                    Ok(_) => info!("ok"),
-                    Err(e) => error!("err : {e}"),
+            Some(macr) => match macr.command.as_str() {
+                "roll" => {
+                    let x = macr.args.unwrap();
+                    match roll::roll(ctx, msg, Args::new(&x, &[])).await {
+                        Ok(_) => String::new(),
+                        Err(e) => format!("Erreur lors de la macro : {e}"),
+                    }
                 }
+                _ => "La commande n'est pas prise en charge".to_string(),
             },
-            None => utils::say_or_error(ctx, msg.channel_id, "La macro n'a pas été trouvée").await
+            None => "La macro n'a pas été trouvée".to_string(),
         }
     } else {
-        utils::say_or_error(ctx, msg.channel_id, "Problème avec la base de données").await
+        "Problème avec la base de données".to_string()
     }
+}
 
-    String::new()
+pub async fn test_macro(
+    ctx: &Context,
+    command: &String,
+    args: &Option<String>,
+) -> Result<(), CommandError> {
+    let temp_chan = if let Some(id) = utils::get_temp_chan(ctx).await {
+        id
+    } else {
+        return Err(utils::command_error("erreur lors du test de la macro"));
+    };
+    let msg = match command.as_str() {
+        "roll" => {
+            roll::roll_intern(
+                ctx,
+                temp_chan,
+                Args::new(&args.clone().unwrap_or(String::new()), &[]),
+            )
+            .await?
+        }
+        _ => {
+            return Err(utils::command_error(
+                "La commande ne peut pas être utilisée comme macro",
+            ))
+        }
+    };
+    // error of deletion is unrelated to macro test so ignore it
+    let _ = msg.delete(&ctx.http).await;
+    Ok(())
 }
