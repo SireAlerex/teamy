@@ -38,15 +38,15 @@ async fn add_macro(
 
 pub async fn run(
     ctx: &Context,
-    base_command: &ApplicationCommandInteraction,
+    command: &ApplicationCommandInteraction,
 ) -> InteractionResponse {
-    let subcommand = &base_command.data.options[0];
+    let subcommand = &command.data.options[0];
     let name = utils::get_option(subcommand, "nom")
         .unwrap()
         .as_str()
         .unwrap()
         .to_string();
-    let command = utils::get_option(subcommand, "commande")
+    let command_name = utils::get_option(subcommand, "commande")
         .unwrap()
         .as_str()
         .unwrap()
@@ -56,7 +56,7 @@ pub async fn run(
     } else {
         None
     };
-    let content = match add_macro(ctx, base_command.user.id.to_string(), name, command, args).await
+    let content = match add_macro(ctx, command.user.id.to_string(), name, command_name, args).await
     {
         Ok(_) => "La macro a bien été ajoutée".to_string(),
         Err(e) => format!("Erreur lors de l'ajout de macro : {e}"),

@@ -9,6 +9,7 @@ use serenity::model::prelude::interaction::application_command::ApplicationComma
 use serenity::model::prelude::{Message, UserId};
 use serenity::model::user::User;
 use serenity::prelude::Context;
+use tracing::info;
 
 #[command]
 #[description = "macro_show_desc"]
@@ -23,7 +24,8 @@ async fn show(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
 
 async fn macro_embed(ctx: &Context, user: &User) -> Result<CreateEmbed, CommandError> {
     let macros = get_macros(ctx, user.id).await?;
-    let pretty_macros: Vec<String> = macros
+    info!("macro:{:#?} empty?:{}", macros, macros.is_empty());
+    let pretty_macros = if !macros.is_empty() { macros
         .iter()
         .map(|macr| {
             format!(
@@ -33,10 +35,14 @@ async fn macro_embed(ctx: &Context, user: &User) -> Result<CreateEmbed, CommandE
                 macr.args.clone().unwrap_or(String::new())
             )
         })
-        .collect();
+        .collect::<Vec<String>>()
+        .join("\n") }
+    else {
+        String::from("Vous n'avez aucune macro")
+    };
     let embed = CreateEmbed::default()
         .description(format!("Macros de {}", user.name))
-        .field("Macros", pretty_macros.join("\n"), false)
+        .field("Macros", pretty_macros, false)
         .color(serenity::utils::Colour::PURPLE)
         .to_owned();
     Ok(embed)
@@ -49,9 +55,9 @@ async fn get_macros(ctx: &Context, user_id: UserId) -> Result<Vec<Macro>, mongod
 
 pub async fn run(
     ctx: &Context,
-    base_command: &ApplicationCommandInteraction,
+    command: &ApplicationCommandInteraction,
 ) -> InteractionResponse {
-    let (content, embed) = match macro_embed(ctx, &base_command.user).await {
+    let (content, embed) = match macro_embed(ctx, &command.user).await {
         Ok(embed) => (String::new(), Some(embed)),
         Err(e) => (
             format!("Une erreur s'est produite lors de l'accès aux macros : {e}"),

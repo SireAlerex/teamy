@@ -26,20 +26,20 @@ async fn del_macro(
     name: String,
 ) -> Result<(), mongodb::error::Error> {
     let query = doc! { "user_id": user_id, "name": name };
-    db::delete_filter::<Macro>(ctx, "macros", query).await
+    db::delete_query::<Macro>(ctx, "macros", query).await
 }
 
 pub async fn run(
     ctx: &Context,
-    base_command: &ApplicationCommandInteraction,
+    command: &ApplicationCommandInteraction,
 ) -> InteractionResponse {
-    let subcommand = &base_command.data.options[0];
+    let subcommand = &command.data.options[0];
     let name = utils::get_option(subcommand, "nom")
         .unwrap()
         .as_str()
         .unwrap()
         .to_string();
-    let content = match del_macro(ctx, base_command.user.id.to_string(), name).await {
+    let content = match del_macro(ctx, command.user.id.to_string(), name).await {
         Ok(_) => "La macro a bien été supprimée".to_string(),
         Err(e) => format!("Erreur lors de la suppression de macro : {e}"),
     };

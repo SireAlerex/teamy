@@ -244,7 +244,7 @@ pub async fn find_filter<
         .await
 }
 
-pub async fn delete_filter<
+pub async fn delete_query<
     T: core::fmt::Debug
         + serde::de::DeserializeOwned
         + serde::Serialize
@@ -259,6 +259,25 @@ pub async fn delete_filter<
     get_coll::<T>(ctx, collection)
         .await?
         .delete_one(query, None)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_multiple_query<
+    T: core::fmt::Debug
+        + serde::de::DeserializeOwned
+        + serde::Serialize
+        + std::marker::Unpin
+        + std::marker::Send
+        + std::marker::Sync,
+>(
+    ctx: &Context,
+    collection: &str,
+    query: Document,
+) -> Result<(), Error> {
+    get_coll::<T>(ctx, collection)
+        .await?
+        .delete_many(query, None)
         .await?;
     Ok(())
 }

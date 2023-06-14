@@ -1,9 +1,10 @@
-use crate::{InteractionMessage, InteractionResponse};
+use crate::{InteractionMessage, InteractionResponse, utils};
 use serenity::builder::CreateApplicationCommand;
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::command::CommandType;
 use serenity::model::prelude::Message;
+use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
 use serenity::prelude::Context;
 
 #[command]
@@ -12,10 +13,13 @@ async fn edit(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     Ok(())
 }
 
-pub fn run() -> InteractionResponse {
+pub async fn run(
+    ctx: &Context,
+    command: &ApplicationCommandInteraction,
+) -> InteractionResponse {
     InteractionResponse::Message(InteractionMessage {
-        content: "macro_edit".to_string(),
-        ephemeral: false,
+        content: String::from("macro_edit"),
+        ephemeral: true,
         embed: None,
     })
 }
