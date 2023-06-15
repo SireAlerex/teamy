@@ -4,7 +4,7 @@ use bson::doc;
 use serenity::framework::standard::CommandError;
 use serenity::{framework::standard::Args, model::prelude::Message, prelude::Context};
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
 pub struct Macro {
     _id: mongodb::bson::oid::ObjectId,
     user_id: String,
@@ -22,6 +22,11 @@ impl Macro {
             command,
             args,
         }
+    }
+
+    pub fn edit(mut self, args: Option<&String>) -> Self {
+        self.args = args.cloned();
+        self
     }
 }
 

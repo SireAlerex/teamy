@@ -35,7 +35,7 @@ pub async fn roll_intern(
     if d_split.len() == 2 {
         n = d_split[0].parse::<i64>().unwrap_or(1);
         if !(1..=200).contains(&n) {
-            return Err("1 <= #dices <= 200".into());
+            return Err("1 <= nombres de dés <= 200".into());
         }
         let (char, pos) = if !d_split[1].contains('-') {
             ('+', true)
@@ -45,7 +45,7 @@ pub async fn roll_intern(
         let mod_split: Vec<&str> = d_split[1].split(char).collect();
         size = mod_split[0].parse::<i64>()?;
         if size < 1 {
-            return Err("dice size >= 1".into());
+            return Err("taille du dé >= 1".into());
         }
         if mod_split.len() == 2 {
             modifier = if pos {
@@ -55,7 +55,7 @@ pub async fn roll_intern(
             };
         }
     } else {
-        return Err("bad syntax, must be '$roll <x>d<n>+<y>'".into());
+        return Err("mauvaise syntaxe, doit être : 'roll <x>d<n>+<y>'".into());
     }
     let x = channel_id.say(&ctx.http, run(size, n, modifier)).await?;
     Ok(x)

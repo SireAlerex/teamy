@@ -36,10 +36,7 @@ async fn add_macro(
     Ok(())
 }
 
-pub async fn run(
-    ctx: &Context,
-    command: &ApplicationCommandInteraction,
-) -> InteractionResponse {
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
     let subcommand = &command.data.options[0];
     let name = utils::get_option(subcommand, "nom")
         .unwrap()

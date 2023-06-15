@@ -25,19 +25,20 @@ async fn show(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
 async fn macro_embed(ctx: &Context, user: &User) -> Result<CreateEmbed, CommandError> {
     let macros = get_macros(ctx, user.id).await?;
     info!("macro:{:#?} empty?:{}", macros, macros.is_empty());
-    let pretty_macros = if !macros.is_empty() { macros
-        .iter()
-        .map(|macr| {
-            format!(
-                "{} : {} {}",
-                macr.name,
-                macr.command,
-                macr.args.clone().unwrap_or(String::new())
-            )
-        })
-        .collect::<Vec<String>>()
-        .join("\n") }
-    else {
+    let pretty_macros = if !macros.is_empty() {
+        macros
+            .iter()
+            .map(|macr| {
+                format!(
+                    "{} : {} {}",
+                    macr.name,
+                    macr.command,
+                    macr.args.clone().unwrap_or(String::new())
+                )
+            })
+            .collect::<Vec<String>>()
+            .join("\n")
+    } else {
         String::from("Vous n'avez aucune macro")
     };
     let embed = CreateEmbed::default()
@@ -53,10 +54,7 @@ async fn get_macros(ctx: &Context, user_id: UserId) -> Result<Vec<Macro>, mongod
     db::get_objects::<Macro>(ctx, "macros", filter).await
 }
 
-pub async fn run(
-    ctx: &Context,
-    command: &ApplicationCommandInteraction,
-) -> InteractionResponse {
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
     let (content, embed) = match macro_embed(ctx, &command.user).await {
         Ok(embed) => (String::new(), Some(embed)),
         Err(e) => (

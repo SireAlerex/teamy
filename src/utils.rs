@@ -81,11 +81,12 @@ pub fn admin_command(command: &ApplicationCommandInteraction) -> bool {
     }
 }
 
-pub async fn say_or_error(ctx: &Context, channel_id: ChannelId, content: &str) {
+pub async fn say_or_error(ctx: &Context, channel_id: ChannelId, content: impl ToString) {
+    let content = content.to_string();
     if content.is_empty() {
         return;
     };
-    if let Err(e) = channel_id.say(&ctx.http, content).await {
+    if let Err(e) = channel_id.say(&ctx.http, content.clone()).await {
         error!(
             "error sending message ({content}) in chan {} : {e}",
             channel_id
@@ -95,6 +96,19 @@ pub async fn say_or_error(ctx: &Context, channel_id: ChannelId, content: &str) {
 
 pub fn command_error(message: impl ToString) -> CommandError {
     Box::<dyn std::error::Error + Send + Sync>::from(message.to_string())
+}
+
+pub fn mongodb_error_message(message: &impl ToString) -> Option<String> {
+    let re = match regex::Regex::new(r"error:(.*),") {
+        Ok(r) => r,
+        Err(_) => return None,
+    };
+    let s = &message.to_string();
+    if let Some(capture) = re.captures(s) {
+        Some(capture[1].to_string())
+    } else {
+        None
+    }
 }
 
 pub async fn get_temp_chan(ctx: &Context) -> Option<ChannelId> {

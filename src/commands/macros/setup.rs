@@ -29,7 +29,7 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
         .create_option(|option| {
             option
                 .name("add")
-                .description("macro_add_desc")
+                .description("crée une macro")
                 .kind(CommandOptionType::SubCommand)
                 .create_sub_option(|suboption| {
                     suboption
@@ -56,18 +56,32 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
         .create_option(|option| {
             option
                 .name("edit")
-                .description("macro_edit_desc")
-                .kind(CommandOptionType::SubCommand)
-        })
-        .create_option(|option| {
-            option
-                .name("del")
-                .description("macro_del_desc")
+                .description("modifie une macro")
                 .kind(CommandOptionType::SubCommand)
                 .create_sub_option(|suboption| {
                     suboption
                         .name("nom")
-                        .description("nom de la macro")
+                        .description("nom de la macro à modifier")
+                        .kind(CommandOptionType::String)
+                        .required(true)
+                })
+                .create_sub_option(|suboption| {
+                    suboption
+                        .name("arguments")
+                        .description("nouveaux arguments de la macro")
+                        .kind(CommandOptionType::String)
+                        .required(true)
+                })
+        })
+        .create_option(|option| {
+            option
+                .name("del")
+                .description("supprime une macro")
+                .kind(CommandOptionType::SubCommand)
+                .create_sub_option(|suboption| {
+                    suboption
+                        .name("nom")
+                        .description("nom de la macro à supprimer")
                         .kind(CommandOptionType::String)
                         .required(true)
                 })
@@ -75,13 +89,13 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
         .create_option(|option| {
             option
                 .name("show")
-                .description("macro_show_desc")
+                .description("affiche les macros de l'utilisateur")
                 .kind(CommandOptionType::SubCommand)
         })
         .create_option(|option| {
             option
                 .name("clear")
-                .description("macro_clear_desc")
+                .description("supprime toutes les macros")
                 .kind(CommandOptionType::SubCommand)
         })
 }

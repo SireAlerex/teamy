@@ -1,6 +1,8 @@
 use bson::Document;
 use mongodb::bson::doc;
 use mongodb::bson::to_document;
+use mongodb::options::UpdateModifications;
+use mongodb::results::UpdateResult;
 use mongodb::{
     error::Error,
     options::{ClientOptions, ResolverConfig},
@@ -193,6 +195,23 @@ pub async fn update<
             object
         )))
     }
+}
+
+pub async fn update_query<
+    T: core::fmt::Debug
+        + serde::de::DeserializeOwned
+        + serde::Serialize
+        + std::marker::Unpin
+        + std::marker::Send
+        + std::marker::Sync,
+>(
+    ctx: &Context,
+    collection: &str,
+    query: Document,
+    update: impl Into<UpdateModifications>,
+) -> Result<UpdateResult, Error> {
+    let coll: Collection<T> = get_coll(ctx, collection).await?;
+    coll.update_one(query, update, None).await
 }
 
 pub async fn delete<
