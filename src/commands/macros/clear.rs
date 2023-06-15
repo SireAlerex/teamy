@@ -9,7 +9,7 @@ use serenity::prelude::Context;
 use super::r#macro::Macro;
 
 #[command]
-#[description = "macro_clear_desc"]
+#[description = "supprime toutes les macros"]
 async fn clear(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     del_macros(ctx, msg.author.id.to_string()).await?;
 

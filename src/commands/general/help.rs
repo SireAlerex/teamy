@@ -1,4 +1,4 @@
-use crate::command::{CommandGroupInfo, CommandGroups, CommandGroupsContainer};
+use crate::command::{CommandGroups, CommandGroupsContainer};
 use crate::{utils, InteractionMessage, InteractionResponse};
 use serenity::model::application::command::CommandOptionType;
 use serenity::{
@@ -6,12 +6,10 @@ use serenity::{
     model::prelude::interaction::application_command::ApplicationCommandInteraction,
     prelude::Context,
 };
-use std::sync::Arc;
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
     let data = ctx.data.read().await;
-    let groups_container: Option<&Arc<tokio::sync::Mutex<CommandGroups>>> =
-        data.get::<CommandGroupsContainer>();
+    let groups_container = data.get::<CommandGroupsContainer>();
 
     if groups_container.is_none() {
         return InteractionResponse::Message(InteractionMessage {
@@ -20,10 +18,9 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
             embed: None,
         });
     }
-    let groups_container: tokio::sync::MutexGuard<CommandGroups> =
-        groups_container.unwrap().lock().await;
+    let groups_container = groups_container.unwrap().lock().await;
 
-    let groups: &Vec<CommandGroupInfo> = &groups_container.groups;
+    let groups = &groups_container.groups;
 
     let title: String;
     let description: String;
@@ -87,12 +84,19 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         description = String::from("Pour obtenir plus d'informations à propos d'une commande, utilisez la commande en argument.");
         for group in groups {
             let name = group.name;
-            let mut commandes_names: Vec<&'static str> = Vec::default();
+            let mut command_names: Vec<String> = Vec::default();
             for command in &group.commands {
-                commandes_names.push(command.names.first().unwrap());
+                command_names.push(format!("`{}`", command.names.first().unwrap()));
             }
-            let value = commandes_names.join("\n");
-            fields.push((name, value, false));
+            let prefixes = group
+                .prefixes
+                .iter()
+                .map(|p| format!("`{p}`"))
+                .collect::<Vec<String>>()
+                .join(", ");
+            let command_names = command_names.join("\n");
+            let value = format!("Préfixe(s) : {}\n{}", prefixes, command_names);
+            fields.push((name, value, true));
         }
     }
 
@@ -105,7 +109,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
 
     InteractionResponse::Message(InteractionMessage {
         content: String::default(),
-        ephemeral: false,
+        ephemeral: true,
         embed: Some(embed),
     })
 }

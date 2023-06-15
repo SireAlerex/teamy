@@ -8,7 +8,10 @@ use serenity::model::prelude::Message;
 use serenity::prelude::Context;
 
 #[command]
-#[description = "macro_add_desc"]
+#[description = "crée une macro"]
+#[usage = "<nom de la macro> <commande> <arguments>"]
+#[example = "init roll d20+4"]
+#[example = "d6 roll d6"]
 async fn add(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let user_id = msg.author.id;
     let name = args.single::<String>()?;

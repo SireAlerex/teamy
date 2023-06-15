@@ -10,7 +10,9 @@ use serenity::prelude::Context;
 use super::r#macro::Macro;
 
 #[command]
-#[description = "macro_del_desc"]
+#[description = "supprime une macro"]
+#[usage = "<nom de la macro>"]
+#[example = "init"]
 async fn del(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let user_id = msg.author.id;
     let name = args.single::<String>()?;

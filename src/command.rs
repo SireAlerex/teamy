@@ -13,6 +13,7 @@ pub struct CommandInfo {
 pub struct CommandGroupInfo {
     pub name: &'static str,
     pub commands: Vec<CommandInfo>,
+    pub prefixes: &'static [&'static str],
 }
 
 pub struct CommandGroups {

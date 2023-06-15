@@ -57,8 +57,8 @@ pub async fn roll_intern(
     } else {
         return Err("mauvaise syntaxe, doit être : 'roll <x>d<n>+<y>'".into());
     }
-    let x = channel_id.say(&ctx.http, run(size, n, modifier)).await?;
-    Ok(x)
+    let msg = channel_id.say(&ctx.http, run(size, n, modifier)).await?;
+    Ok(msg)
 }
 
 pub fn run(size: i64, n: i64, modifier: i64) -> String {
@@ -73,16 +73,18 @@ pub fn run(size: i64, n: i64, modifier: i64) -> String {
     }
     res = res[..res.len() - 2].to_string(); //remove last "+ "
 
-    res = match modifier.cmp(&0) {
-        Ordering::Greater => format!("{}(+{}) ", res, modifier),
-        Ordering::Less => format!("{}({}) ", res, modifier),
-        Ordering::Equal => res,
+    let (mut res, show_mod) = match modifier.cmp(&0) {
+        Ordering::Greater => (format!("{}(+{}) ", res, modifier), format!("+{modifier}")),
+        Ordering::Less => (format!("{}({}) ", res, modifier), modifier.to_string()),
+        Ordering::Equal => (res, String::new()),
     };
+    let dice_number = if n > 1 { n.to_string() } else { String::new() };
+    let start_message = format!("`[{dice_number}d{size}{show_mod}]`");
 
     if modifier != 0 || n > 1 {
         res = format!("{}= {}", res, sum);
     }
-    res
+    format!("{start_message} {res}")
 }
 
 pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {

@@ -279,13 +279,21 @@ async fn my_help(
 }
 
 #[hook]
-async fn after(_ctx: &Context, _msg: &Message, command_name: &str, command_result: CommandResult) {
+async fn after(ctx: &Context, msg: &Message, command_name: &str, command_result: CommandResult) {
     match command_result {
         Ok(()) => info!("Processed command '{}'", command_name),
-        Err(why) => error!(
-            "Command '{}' returned error {:?} (message was '{}')",
-            command_name, why, _msg.content
-        ),
+        Err(why) => {
+            error!(
+                "Command '{}' returned error {:?} (message was '{}')",
+                command_name, why, msg.content
+            );
+            utils::say_or_error(
+                ctx,
+                msg.channel_id,
+                format!("Erreur lors de la commande : {why}"),
+            )
+            .await
+        }
     }
 }
 
@@ -334,6 +342,7 @@ async fn serenity(
         groups.push(CommandGroupInfo {
             name: group.name,
             commands,
+            prefixes: group.options.prefixes,
         });
     }
     let groups: CommandGroups = CommandGroups { groups };

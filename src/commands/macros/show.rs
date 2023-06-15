@@ -9,10 +9,9 @@ use serenity::model::prelude::interaction::application_command::ApplicationComma
 use serenity::model::prelude::{Message, UserId};
 use serenity::model::user::User;
 use serenity::prelude::Context;
-use tracing::info;
 
 #[command]
-#[description = "macro_show_desc"]
+#[description = "affiche les macros de l'utilisateur"]
 async fn show(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     let embed = macro_embed(ctx, &msg.author).await?;
     let _ = msg
@@ -24,7 +23,6 @@ async fn show(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
 
 async fn macro_embed(ctx: &Context, user: &User) -> Result<CreateEmbed, CommandError> {
     let macros = get_macros(ctx, user.id).await?;
-    info!("macro:{:#?} empty?:{}", macros, macros.is_empty());
     let pretty_macros = if !macros.is_empty() {
         macros
             .iter()
