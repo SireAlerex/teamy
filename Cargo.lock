@@ -2239,6 +2239,7 @@ dependencies = [
  "anyhow",
  "bson",
  "chrono",
+ "itertools",
  "mongodb",
  "rand",
  "regex",

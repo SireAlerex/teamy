@@ -10,6 +10,7 @@ publish = false
 anyhow = "1.0.71"
 bson = { version = "2.6.1", features = ["chrono-0_4"] }
 chrono = "0.4.26"
+itertools = "0.10.5"
 mongodb = "2.5.0"
 rand = "0.8.5"
 regex = "1.8.4"
