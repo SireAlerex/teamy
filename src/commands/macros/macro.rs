@@ -30,6 +30,25 @@ impl Macro {
     }
 }
 
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
+pub struct TempMacro {
+    _id: mongodb::bson::oid::ObjectId,
+    pub user_id: String,
+    pub command: String,
+    pub args: Option<String>,
+}
+
+impl TempMacro {
+    pub fn builder(user_id: String, command: String, args: Option<String>) -> TempMacro {
+        TempMacro {
+            _id: mongodb::bson::oid::ObjectId::new(),
+            user_id,
+            command,
+            args,
+        }
+    }
+}
+
 pub async fn handle_macro(ctx: &Context, msg: &Message) -> String {
     let name = msg.content[1..].split(' ').next().unwrap_or("");
     let filter = doc! {"user_id": msg.author.id.to_string(), "name": name};

@@ -76,6 +76,8 @@ impl TypeMapKey for TempChanContainer {
 
 pub enum InteractionResponse {
     Message(InteractionMessage),
+    Modal,
+    None,
 }
 
 pub struct InteractionMessage {
@@ -152,33 +154,20 @@ impl EventHandler for Bot {
                 guild
                     .set_application_commands(&ctx.http, |commands| {
                         commands
-                            .create_application_command(|command| general::help::register(command))
-                            .create_application_command(|command| {
-                                general::bonjour::register(command)
-                            })
-                            .create_application_command(|command| general::slide::register(command))
-                            .create_application_command(|command| general::ping::register(command))
-                            .create_application_command(|command| {
-                                general::nerd::register_chat_input(command)
-                            })
-                            .create_application_command(|command| {
-                                general::nerd::register_message(command)
-                            })
-                            .create_application_command(|command| {
-                                general::id::register_user(command)
-                            })
-                            .create_application_command(|command| {
-                                general::id::register_chat_input(command)
-                            })
-                            .create_application_command(|command| general::roll::register(command))
-                            .create_application_command(|command| {
-                                general::based::register_chat_input(command)
-                            })
-                            .create_application_command(|command| {
-                                general::based::register_message(command)
-                            })
-                            .create_application_command(|command| general::tg::register(command))
-                            .create_application_command(|command| macros::setup::register(command))
+                            .create_application_command(|c| general::help::register(c))
+                            .create_application_command(|c| general::bonjour::register(c))
+                            .create_application_command(|c| general::slide::register(c))
+                            .create_application_command(|c| general::ping::register(c))
+                            .create_application_command(|c| general::nerd::register_chat_input(c))
+                            .create_application_command(|c| general::nerd::register_message(c))
+                            .create_application_command(|c| general::id::register_user(c))
+                            .create_application_command(|c| general::id::register_chat_input(c))
+                            .create_application_command(|c| general::roll::register(c))
+                            .create_application_command(|c| general::based::register_chat_input(c))
+                            .create_application_command(|c| general::based::register_message(c))
+                            .create_application_command(|c| general::tg::register(c))
+                            .create_application_command(|c| macros::setup::register(c))
+                            .create_application_command(|c| macros::setup::register_message(c))
                     })
                     .await,
             ));
@@ -193,62 +182,76 @@ impl EventHandler for Bot {
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::ApplicationCommand(command) = interaction {
-            let result: InteractionResponse = match command.data.kind {
-                CommandType::ChatInput => match command.data.name.as_str() {
-                    "help" => general::help::run(&ctx, &command).await,
-                    "bonjour" => general::bonjour::run(),
-                    "slide" => general::slide::run(&ctx, &command).await,
-                    "ping" => general::ping::run(&ctx).await,
-                    "nerd" => general::nerd::run_chat_input(&command.data.options),
-                    "id" => general::id::run_chat_input(&command.data.options),
-                    "roll" => general::roll::run_chat_input(&command.data.options),
-                    "basé" => general::based::run_chat_input(&command.data.options),
-                    "tg" => general::tg::run(&ctx, &command).await,
-                    "macro" => macros::setup::run(&ctx, &command).await,
+        match interaction {
+            Interaction::ApplicationCommand(command) => {
+                let result: InteractionResponse = match command.data.kind {
+                    CommandType::ChatInput => match command.data.name.as_str() {
+                        "help" => general::help::run(&ctx, &command).await,
+                        "bonjour" => general::bonjour::run(),
+                        "slide" => general::slide::run(&ctx, &command).await,
+                        "ping" => general::ping::run(&ctx).await,
+                        "nerd" => general::nerd::run_chat_input(&command.data.options),
+                        "id" => general::id::run_chat_input(&command.data.options),
+                        "roll" => general::roll::run_chat_input(&command.data.options),
+                        "basé" => general::based::run_chat_input(&command.data.options),
+                        "tg" => general::tg::run(&ctx, &command).await,
+                        "macro" => macros::setup::run(&ctx, &command).await,
+                        _ => InteractionResponse::Message(InteractionMessage {
+                            content: format!("Unkown command ChatInput : {}", command.data.name),
+                            ephemeral: true,
+                            embed: None,
+                        }),
+                    },
+                    CommandType::Message => match command.data.name.as_str() {
+                        "nerd" => general::nerd::run_message(&ctx, &command).await,
+                        "basé" => general::based::run_message(&ctx, &command).await,
+                        "macro add" => macros::add::run_message_form(&ctx, &command).await,
+                        _ => InteractionResponse::Message(InteractionMessage {
+                            content: format!("Unkown command Message : {}", command.data.name),
+                            ephemeral: true,
+                            embed: None,
+                        }),
+                    },
+                    CommandType::User => match command.data.name.as_str() {
+                        "id" => general::id::run_user(&ctx, &command).await,
+                        _ => InteractionResponse::Message(InteractionMessage {
+                            content: format!("Unkown command User : {}", command.data.name),
+                            ephemeral: true,
+                            embed: None,
+                        }),
+                    },
                     _ => InteractionResponse::Message(InteractionMessage {
-                        content: format!("Unkown command ChatInput : {}", command.data.name),
+                        content: "Unkown data kind".to_owned(),
                         ephemeral: true,
                         embed: None,
                     }),
-                },
-                CommandType::Message => match command.data.name.as_str() {
-                    "nerd" => general::nerd::run_message(&ctx, &command).await,
-                    "basé" => general::based::run_message(&ctx, &command).await,
-                    _ => InteractionResponse::Message(InteractionMessage {
-                        content: format!("Unkown command Message : {}", command.data.name),
-                        ephemeral: true,
-                        embed: None,
-                    }),
-                },
-                CommandType::User => match command.data.name.as_str() {
-                    "id" => general::id::run_user(&ctx, &command).await,
-                    _ => InteractionResponse::Message(InteractionMessage {
-                        content: format!("Unkown command User : {}", command.data.name),
-                        ephemeral: true,
-                        embed: None,
-                    }),
-                },
-                _ => InteractionResponse::Message(InteractionMessage {
-                    content: "Unkown data kind".to_owned(),
-                    ephemeral: true,
-                    embed: None,
-                }),
-            };
+                };
 
-            match result {
-                InteractionResponse::Message(interaction) => {
-                    utils::interaction_response_message(
-                        &ctx,
-                        &command,
-                        interaction.content,
-                        interaction.ephemeral,
-                        interaction.embed,
-                    )
-                    .await
+                match result {
+                    InteractionResponse::Message(interaction) => {
+                        utils::interaction_response_message(&ctx, &command, interaction).await
+                    }
+                    InteractionResponse::Modal => {
+                        utils::interaction_response_modal(&ctx, &command).await
+                    }
+                    InteractionResponse::None => (),
                 }
             }
-        };
+            Interaction::ModalSubmit(modal) => {
+                let res = match modal.data.custom_id.as_str() {
+                    consts::MACRO_ADD_FORM_ID => macros::add::run_message(&ctx, &modal).await,
+                    _ => InteractionResponse::Message(InteractionMessage {
+                        content: "modal inconnu".to_owned(),
+                        ephemeral: true,
+                        embed: None,
+                    }),
+                };
+                if let InteractionResponse::Message(m) = res {
+                    utils::interaction_response_message_from_modal(&ctx, &modal, m).await;
+                }
+            }
+            _ => (),
+        }
     }
 }
 

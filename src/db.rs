@@ -1,3 +1,4 @@
+use bson::Bson;
 use bson::Document;
 use mongodb::bson::doc;
 use mongodb::bson::to_document;
@@ -151,11 +152,11 @@ pub async fn insert<
     ctx: &Context,
     collection: &str,
     object: &T,
-) -> Result<(), Error> {
+) -> Result<Bson, Error> {
     let coll: Collection<T> = get_coll(ctx, collection).await?;
     if !is_object_in_coll(ctx, collection, object).await? {
-        let _ = coll.insert_one(object, None).await?;
-        Ok(())
+        let id = coll.insert_one(object, None).await?.inserted_id;
+        Ok(id)
     } else {
         Err(mongodb_error("l'objet à insérer existe déjà"))
     }

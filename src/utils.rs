@@ -2,15 +2,16 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serenity::{
-    builder::CreateEmbed,
     client::bridge::gateway::ShardId,
     framework::standard::CommandError,
     gateway::ConnectionStage,
     json::Value,
     model::{
         prelude::{
+            component::InputTextStyle,
             interaction::{
                 application_command::{ApplicationCommandInteraction, CommandDataOption},
+                modal::ModalSubmitInteraction,
                 InteractionResponseType,
             },
             ChannelId, Message,
@@ -21,7 +22,7 @@ use serenity::{
 };
 use tracing::error;
 
-use crate::ShardManagerContainer;
+use crate::{InteractionMessage, ShardManagerContainer};
 
 pub async fn find_message(
     ctx: &Context,
@@ -120,7 +121,7 @@ pub async fn get_temp_chan(ctx: &Context) -> Option<ChannelId> {
     Some(*temp_chan)
 }
 
-pub fn get_option(data: & CommandDataOption, name: impl ToString) -> Option<&Value> {
+pub fn get_option(data: &CommandDataOption, name: impl ToString) -> Option<&Value> {
     data.options
         .iter()
         .find(|o| o.name == name.to_string())?
@@ -131,10 +132,13 @@ pub fn get_option(data: & CommandDataOption, name: impl ToString) -> Option<&Val
 pub async fn interaction_response_message(
     ctx: &Context,
     command: &ApplicationCommandInteraction,
-    text: String,
-    ephemeral: bool,
-    embed: Option<CreateEmbed>,
+    interaction_message: InteractionMessage,
 ) {
+    let (text, ephemeral, embed) = (
+        interaction_message.content,
+        interaction_message.ephemeral,
+        interaction_message.embed,
+    );
     if let Err(why) = command
         .create_interaction_response(&ctx.http, |response| {
             response
@@ -145,6 +149,64 @@ pub async fn interaction_response_message(
                     } else {
                         message.content(text).ephemeral(ephemeral)
                     }
+                })
+        })
+        .await
+    {
+        let error_message = format!("Erreur lors de la réponse à l'interaction : {why}");
+        if let Err(e) = command.channel_id.say(&ctx.http, error_message).await {
+            error!("Error sending error message ({why}) to channel because : {e}");
+        }
+    }
+}
+
+pub async fn interaction_response_message_from_modal(
+    ctx: &Context,
+    modal: &ModalSubmitInteraction,
+    interaction_message: InteractionMessage,
+) {
+    let (text, ephemeral, embed) = (
+        interaction_message.content,
+        interaction_message.ephemeral,
+        interaction_message.embed,
+    );
+    if let Err(why) = modal
+        .create_interaction_response(&ctx.http, |response| {
+            response
+                .kind(InteractionResponseType::ChannelMessageWithSource)
+                .interaction_response_data(|message| {
+                    if let Some(e) = embed {
+                        message.content(text).ephemeral(ephemeral).add_embed(e)
+                    } else {
+                        message.content(text).ephemeral(ephemeral)
+                    }
+                })
+        })
+        .await
+    {
+        let error_message = format!("Erreur lors de la réponse à l'interaction : {why}");
+        if let Err(e) = modal.channel_id.say(&ctx.http, error_message).await {
+            error!("Error sending error message ({why}) to channel because : {e}");
+        }
+    }
+}
+
+pub async fn interaction_response_modal(ctx: &Context, command: &ApplicationCommandInteraction) {
+    if let Err(why) = command
+        .create_interaction_response(&ctx.http, |response| {
+            response
+                .kind(InteractionResponseType::Modal)
+                .interaction_response_data(|modal| {
+                    modal
+                        .title("Formulaire")
+                        .components(|input| {
+                            input.create_action_row(|f| {
+                                f.create_input_text(|t| {
+                                    t.label("label").custom_id(2).style(InputTextStyle::Short)
+                                })
+                            })
+                        })
+                        .custom_id(1)
                 })
         })
         .await

@@ -99,3 +99,7 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
                 .kind(CommandOptionType::SubCommand)
         })
 }
+
+pub fn register_message(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    command.name("macro add").kind(CommandType::Message)
+}

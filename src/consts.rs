@@ -1,3 +1,8 @@
+// interaction modal custom ids
+pub const MACRO_ADD_FORM_ID: &str = "macro_add_form";
+pub const MACRO_ADD_FORM_NAME: &str = "macro_add_name";
+
+//
 pub static SALUTATIONS: [&str; 4] = ["Bonjour", "Salut", "Coucou", "Yo"];
 
 pub static BOT: [&str; 3] = ["bot", "robot", "teamy"];
