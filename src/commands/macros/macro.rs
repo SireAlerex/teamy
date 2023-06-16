@@ -54,7 +54,7 @@ pub async fn handle_macro(ctx: &Context, msg: &Message) -> String {
 
 pub async fn test_macro(
     ctx: &Context,
-    command: &String,
+    command: &str,
     args: &Option<String>,
 ) -> Result<(), CommandError> {
     let temp_chan = if let Some(id) = utils::get_temp_chan(ctx).await {
@@ -62,7 +62,7 @@ pub async fn test_macro(
     } else {
         return Err(utils::command_error("erreur lors du test de la macro"));
     };
-    let msg = match command.as_str() {
+    let msg = match command {
         "roll" => {
             roll::roll_intern(
                 ctx,

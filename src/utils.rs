@@ -104,11 +104,7 @@ pub fn mongodb_error_message(message: &impl ToString) -> Option<String> {
         Err(_) => return None,
     };
     let s = &message.to_string();
-    if let Some(capture) = re.captures(s) {
-        Some(capture[1].to_string())
-    } else {
-        None
-    }
+    re.captures(s).map(|capture| capture[1].to_string())
 }
 
 pub async fn get_temp_chan(ctx: &Context) -> Option<ChannelId> {
@@ -121,10 +117,10 @@ pub async fn get_temp_chan(ctx: &Context) -> Option<ChannelId> {
         }
     };
     let temp_chan = temp_chan.lock().await;
-    Some(temp_chan.clone())
+    Some(*temp_chan)
 }
 
-pub fn get_option<'a>(data: &'a CommandDataOption, name: impl ToString) -> Option<&'a Value> {
+pub fn get_option(data: & CommandDataOption, name: impl ToString) -> Option<&Value> {
     data.options
         .iter()
         .find(|o| o.name == name.to_string())?

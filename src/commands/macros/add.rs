@@ -51,11 +51,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         .as_str()
         .unwrap()
         .to_string();
-    let args = if let Some(value) = utils::get_option(subcommand, "arguments") {
-        Some(value.as_str().unwrap().to_string())
-    } else {
-        None
-    };
+    let args = utils::get_option(subcommand, "arguments").map(|value| value.as_str().unwrap().to_string());
     let content = match add_macro(ctx, command.user.id.to_string(), name, command_name, args).await
     {
         Ok(_) => "La macro a bien été ajoutée".to_string(),
