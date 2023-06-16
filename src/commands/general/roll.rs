@@ -15,8 +15,10 @@ use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum DropKeep {
-    D,
-    K,
+    DL,
+    DH,
+    KL,
+    KH,
     None,
 }
 
@@ -24,8 +26,10 @@ impl FromStr for DropKeep {
     type Err = Box<dyn std::error::Error + Send + Sync>;
     fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
         match s {
-            "d" => Ok(DropKeep::D),
-            "k" => Ok(DropKeep::K),
+            "d" | "dl" => Ok(DropKeep::DL),
+            "dh" => Ok(DropKeep::DH),
+            "k" | "kh" => Ok(DropKeep::KH),
+            "kl" => Ok(DropKeep::KL),
             _ => Ok(DropKeep::None),
         }
     }
@@ -34,8 +38,10 @@ impl FromStr for DropKeep {
 impl std::fmt::Display for DropKeep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         let s = match self {
-            DropKeep::D => "d",
-            DropKeep::K => "k",
+            DropKeep::DL => "d",
+            DropKeep::DH => "dh",
+            DropKeep::KH => "k",
+            DropKeep::KL => "kl",
             DropKeep::None => "",
         };
         write!(f, "{s}")
@@ -54,7 +60,7 @@ pub struct Roll {
     size: i64,
     modifier: i64,
     dk: DropKeep,
-    dk_val: Option<i64>,
+    dk_val: Option<usize>,
 }
 
 impl Roll {
@@ -63,7 +69,7 @@ impl Roll {
         size: i64,
         modifier: i64,
         dk: DropKeep,
-        dk_val: Option<i64>,
+        dk_val: Option<usize>,
     ) -> Roll {
         Roll {
             number,
@@ -75,7 +81,7 @@ impl Roll {
     }
 
     /// (number, size, modifier, dk, dk_val)
-    pub fn values(&self) -> (i64, i64, i64, DropKeep, Option<i64>) {
+    pub fn values(&self) -> (i64, i64, i64, DropKeep, Option<usize>) {
         (self.number, self.size, self.modifier, self.dk, self.dk_val)
     }
 }
@@ -83,10 +89,14 @@ impl Roll {
 #[command]
 #[aliases("r")]
 #[description = "Lancer de dés"]
-#[usage = "<nombre de dés>d<taille des dés>+<modificateur>"]
+#[usage = "<nombre de dés>d<taille des dés>+<modificateur><drop/keep><valeur du drop/keep>"]
 #[example = "2d6+3"]
 #[example = "3d4-1"]
 #[example = "d8"]
+#[example = "4d6k3 (équivalent à 4d6kh3)"]
+#[example = "4d6d1 (équivalent à 4d6dl1)"]
+#[example = "2d20dh1"]
+#[example = "2d20kl1"]
 pub async fn roll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     let _ = roll_intern(ctx, msg.channel_id, args).await?;
     Ok(())
@@ -105,7 +115,7 @@ pub async fn roll_intern(
 
 fn regex_roll(roll: impl ToString) -> Result<Roll, CommandError> {
     let re = regex::Regex::new(
-        r"(?P<number>\d+)?d(?P<size>\d+)(?P<modifier>\+\d+|-\d+)?(?P<dk>k|d)?(?P<dk_val>\d+)?",
+        r"(?P<number>\d+)?d(?P<size>\d+)(?P<modifier>\+\d+|-\d+)?(?P<dk>kh|kl|k|dh|dl|d)?(?P<dk_val>\d+)?",
     )?;
     let s = &roll.to_string();
     let caps = match re.captures(s) {
@@ -142,7 +152,7 @@ fn regex_roll(roll: impl ToString) -> Result<Roll, CommandError> {
         None => "",
     })?;
     let dk_val = match caps.name("dk_val") {
-        Some(m) => Some(m.as_str().parse::<i64>()?),
+        Some(m) => Some(m.as_str().parse::<usize>()?),
         None => None,
     };
     if dk.is_some() && dk_val.is_none() {
@@ -165,23 +175,45 @@ pub fn run(roll: Roll) -> String {
     let initial_roll = rolls_str(&rolls, modifier);
 
     match dk {
-        DropKeep::D => {
-            let drop_rolls = drop_low(rolls, dk_val.unwrap().try_into().unwrap());
-            let new_rolls = format!("({initial_roll}) -> {}", rolls_str(&drop_rolls, modifier));
-            let res = sum(drop_rolls, modifier);
-            final_str(start, res, new_rolls, n, modifier)
+        DropKeep::DL => {
+            dl_str(rolls, n, modifier, dk_val.unwrap(), initial_roll, start)
         }
-        DropKeep::K => {
-            let keep_rolls = drop_low(rolls, (n - dk_val.unwrap()).try_into().unwrap());
-            let new_rolls = format!("({initial_roll}) -> {}", rolls_str(&keep_rolls, modifier));
-            let res = sum(keep_rolls, modifier);
-            final_str(start, res, new_rolls, n, modifier)
+        DropKeep::KH => {
+            let val = (n as usize).checked_sub(dk_val.unwrap());
+            match val {
+                Some(x) => dl_str(rolls, n, modifier, x, initial_roll, start),
+                None => "la valeur de drop/keep doit être inférieure ou égale au nombre de dé".to_string()
+            }
+        }
+        DropKeep::DH => {
+            dh_str(rolls, n, modifier, dk_val.unwrap(), initial_roll, start)
+        }
+        DropKeep::KL => {
+            let val = (n as usize).checked_sub(dk_val.unwrap());
+            match val {
+                Some(x) => dh_str(rolls, n, modifier, x, initial_roll, start),
+                None => "la valeur de drop/keep doit être inférieure ou égale au nombre de dé".to_string()
+            }
         }
         DropKeep::None => {
             let res = rolls.iter().sum::<i64>() + modifier;
             final_str(start, res, initial_roll, n, modifier)
         }
     }
+}
+
+fn dh_str(rolls: Vec<i64>, n: i64, modifier: i64, dk_val: usize, initial_roll: String, start: String) -> String {
+    dk_str(drop_high(rolls, dk_val), n, modifier, initial_roll, start)
+}
+
+fn dl_str(rolls: Vec<i64>, n: i64, modifier: i64, dk_val: usize, initial_roll: String, start: String) -> String {
+    dk_str(drop_low(rolls, dk_val), n, modifier, initial_roll, start)
+}
+
+fn dk_str(dk_rolls: Vec<i64>, n: i64, modifier: i64, initial_roll: String, start: String) -> String {
+    let new_rolls = format!("({initial_roll}) -> {}", rolls_str(&dk_rolls, modifier));
+    let res = sum(dk_rolls, modifier);
+    final_str(start, res, new_rolls, n, modifier)
 }
 
 fn final_str(start: String, res: i64, rolls: String, n: i64, modifier: i64) -> String {
@@ -222,6 +254,20 @@ fn drop_low(mut rolls: Vec<i64>, n: usize) -> Vec<i64> {
     rolls
 }
 
+fn drop_high(mut rolls: Vec<i64>, n: usize) -> Vec<i64> {
+    let bad_elements = rolls
+        .clone()
+        .into_iter()
+        .sorted()
+        .skip(rolls.len() - n)
+        .collect::<Vec<i64>>();
+    for elem in bad_elements {
+        let index = rolls.clone().into_iter().position(|e| e == elem).unwrap();
+        rolls.remove(index);
+    }
+    rolls
+}
+
 fn start_message(roll: &Roll) -> String {
     let (n, size, modifier, dk, dk_val) = roll.values();
     let show_mod = match modifier.cmp(&0) {
@@ -245,13 +291,13 @@ fn add_modifier(s: String, modifier: i64) -> String {
     }
 }
 
-fn get_dk(s: impl ToString) -> Result<(DropKeep, Option<i64>), CommandError> {
+fn get_dk(s: impl ToString) -> Result<(DropKeep, Option<usize>), CommandError> {
     // default case
     if s.to_string().is_empty() {
         return Ok((DropKeep::None, None));
     }
 
-    let re = regex::Regex::new(r"(?P<dk>k|d)(?P<dk_val>\d+)")?;
+    let re = regex::Regex::new(r"(?P<dk>kh|kl|k|dh|dl|d)(?P<dk_val>\d+)")?;
     let s = &s.to_string();
     let caps = match re.captures(s) {
         Some(caps) => caps,
@@ -262,7 +308,7 @@ fn get_dk(s: impl ToString) -> Result<(DropKeep, Option<i64>), CommandError> {
         None => "",
     })?;
     let dk_val = match caps.name("dk_val") {
-        Some(m) => Some(m.as_str().parse::<i64>()?),
+        Some(m) => Some(m.as_str().parse::<usize>()?),
         None => None,
     };
     if dk.is_some() && dk_val.is_none() {
@@ -343,7 +389,7 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
         .create_option(|option| {
             option
                 .name("drop_keep")
-                .description("Valeur possibles : (k, d) suivi d'un nombre")
+                .description("Valeur possibles : (k, kh, kl, d, dh, dl) suivi d'un nombre")
                 .kind(CommandOptionType::String)
         })
 }
