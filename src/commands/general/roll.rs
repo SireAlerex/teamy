@@ -8,17 +8,19 @@ use serenity::model::application::command::CommandOptionType;
 use serenity::model::prelude::interaction::application_command::{
     CommandDataOption, CommandDataOptionValue,
 };
-use serenity::model::prelude::{ChannelId, Message};
+use serenity::model::prelude::*;
 use serenity::prelude::Context;
 use std::cmp::Ordering;
+use std::fmt::Display;
 use std::str::FromStr;
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash, Default)]
 pub enum DropKeep {
     DL,
     DH,
     KL,
     KH,
+    #[default]
     None,
 }
 
@@ -54,35 +56,234 @@ impl DropKeep {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct Roll {
     number: i64,
     size: i64,
     modifier: i64,
     dk: DropKeep,
-    dk_val: Option<usize>,
+    dk_val: Option<i64>,
 }
 
 impl Roll {
-    pub fn builder(
-        number: i64,
-        size: i64,
-        modifier: i64,
-        dk: DropKeep,
-        dk_val: Option<usize>,
-    ) -> Roll {
-        Roll {
-            number,
-            size,
-            modifier,
-            dk,
-            dk_val,
-        }
+    pub fn new() -> Roll {
+        Roll::default()
     }
 
-    /// (number, size, modifier, dk, dk_val)
-    pub fn values(&self) -> (i64, i64, i64, DropKeep, Option<usize>) {
-        (self.number, self.size, self.modifier, self.dk, self.dk_val)
+    pub fn roll(&self) -> RollResult {
+        let mut rolls: Vec<i64> = Vec::new();
+        let mut rng = rand::thread_rng();
+
+        for _ in 0..self.number {
+            rolls.push(rng.gen_range(1..=self.size));
+        }
+
+        let initial_roll = rolls_str(&rolls, self.modifier);
+
+        let (s, rolls) = if self.dk.is_some() {
+            // dk_val is forced to be some if dk is some
+            let dk_val = self.dk_val.unwrap();
+            let new_rolls = match self.dk {
+                DropKeep::DL => drop_low(rolls, dk_val),
+                DropKeep::KH => drop_low(rolls, self.number - dk_val),
+                DropKeep::DH => drop_high(rolls, dk_val),
+                DropKeep::KL => drop_high(rolls, self.number - dk_val),
+                _ => panic!("drop/keep is_some error"),
+            };
+            (
+                format!(
+                    "({initial_roll}) -> {}",
+                    rolls_str(&new_rolls, self.modifier)
+                ),
+                new_rolls,
+            )
+        } else {
+            (initial_roll, rolls)
+        };
+
+        let res = sum(&rolls, self.modifier).to_string();
+        let message = format!("{self} {}", show_res(s, res, self.number, self.modifier));
+        RollResult {
+            roll: self,
+            rolls,
+            message,
+        }
+    }
+}
+
+impl Default for Roll {
+    fn default() -> Self {
+        Roll {
+            number: 1,
+            size: 6,
+            modifier: 0,
+            dk: DropKeep::default(),
+            dk_val: None,
+        }
+    }
+}
+
+impl std::fmt::Display for Roll {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        let show_mod = match self.modifier.cmp(&0) {
+            Ordering::Greater => format!("+{}", self.modifier),
+            Ordering::Less => self.modifier.to_string(),
+            Ordering::Equal => String::new(),
+        };
+        let dk_val = if let Some(x) = self.dk_val {
+            x.to_string()
+        } else {
+            String::new()
+        };
+        let s = format!(
+            "`[r {}d{}{show_mod}{}{dk_val}]`",
+            self.number, self.size, self.dk
+        );
+        write!(f, "{s}")
+    }
+}
+
+impl FromStr for Roll {
+    type Err = Box<dyn std::error::Error + Send + Sync>;
+    fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
+        let re = regex::Regex::new(
+            r"(?P<number>\d+)?d(?P<size>\d+)(?P<modifier>\+\d+|-\d+)?(?P<dk>kh|kl|k|dh|dl|d)?(?P<dk_val>\d+)?",
+        )?;
+        let caps = match re.captures(s) {
+            Some(caps) => caps,
+            None => return Err(utils::command_error("erreur captures regex")),
+        };
+
+        let number = match caps.name("number") {
+            Some(n) => n.as_str(),
+            None => "1",
+        }
+        .parse::<i64>()?;
+        if !(1..=100).contains(&number) {
+            return Err(utils::command_error(
+                "le nombre de dés doit appartenir à [1; 200]",
+            ));
+        }
+        let size = match caps.name("size") {
+            Some(m) => m.as_str().parse::<i64>()?,
+            None => return Err(utils::command_error("erreur pas de taille de dé")),
+        };
+        if size <= 1 {
+            return Err(utils::command_error(
+                "la taille du dé doit être supérieure strictement à 1",
+            ));
+        }
+        let modifier = match caps.name("modifier") {
+            Some(n) => n.as_str(),
+            None => "0",
+        }
+        .parse::<i64>()?;
+        let dk: DropKeep = DropKeep::from_str(match caps.name("dk") {
+            Some(m) => m.as_str(),
+            None => "",
+        })?;
+        let dk_val = match caps.name("dk_val") {
+            Some(m) => Some(m.as_str().parse::<i64>()?),
+            None => None,
+        };
+        if dk.is_some() && dk_val.is_none() {
+            return Err(utils::command_error("valeur attendu après le drop/keep"));
+        }
+        if dk_val.is_some() && dk_val.unwrap() > number {
+            return Err(utils::command_error(
+                "la valeur du drop/keep doit être inférieure ou égale au nombre de dés",
+            ));
+        }
+
+        let roll = RollBuilder::new()
+            .number(number)
+            .size(size)
+            .modifier(modifier)
+            .drop_keep(dk)
+            .drop_keep_value(dk_val)
+            .build();
+        Ok(roll)
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
+pub struct RollBuilder {
+    number: i64,
+    size: i64,
+    modifier: i64,
+    dk: DropKeep,
+    dk_val: Option<i64>,
+}
+
+impl Default for RollBuilder {
+    fn default() -> Self {
+        RollBuilder {
+            number: 1,
+            size: 6,
+            modifier: 0,
+            dk: DropKeep::default(),
+            dk_val: None,
+        }
+    }
+}
+
+impl RollBuilder {
+    pub fn new() -> RollBuilder {
+        RollBuilder::default()
+    }
+
+    pub fn number(&mut self, number: i64) -> &mut Self {
+        self.number = number;
+        self
+    }
+
+    pub fn size(&mut self, size: i64) -> &mut Self {
+        self.size = size;
+        self
+    }
+
+    pub fn modifier(&mut self, modifier: i64) -> &mut Self {
+        self.modifier = modifier;
+        self
+    }
+
+    pub fn drop_keep(&mut self, dk: DropKeep) -> &mut Self {
+        self.dk = dk;
+        self
+    }
+
+    pub fn drop_keep_value(&mut self, dk_val: Option<i64>) -> &mut Self {
+        self.dk_val = dk_val;
+        self
+    }
+
+    pub fn build(&mut self) -> Roll {
+        Roll {
+            number: self.number,
+            size: self.size,
+            modifier: self.modifier,
+            dk: self.dk,
+            dk_val: self.dk_val,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
+pub struct RollResult<'a> {
+    roll: &'a Roll,
+    rolls: Vec<i64>,
+    message: String,
+}
+
+impl RollResult<'_> {
+    pub fn sum(&self) -> i64 {
+        sum(&self.rolls, self.roll.modifier)
+    }
+}
+
+impl Display for RollResult<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", self.message)
     }
 }
 
@@ -107,180 +308,65 @@ pub async fn roll_intern(
     channel_id: ChannelId,
     args: Args,
 ) -> Result<Message, CommandError> {
-    let roll = regex_roll(args.message())?;
-    let msg = channel_id.say(&ctx.http, run(roll)).await?;
+    let msg = channel_id
+        .say(&ctx.http, Roll::from_str(args.message())?.roll())
+        .await?;
 
     Ok(msg)
 }
 
-fn regex_roll(roll: impl ToString) -> Result<Roll, CommandError> {
-    let re = regex::Regex::new(
-        r"(?P<number>\d+)?d(?P<size>\d+)(?P<modifier>\+\d+|-\d+)?(?P<dk>kh|kl|k|dh|dl|d)?(?P<dk_val>\d+)?",
-    )?;
-    let s = &roll.to_string();
-    let caps = match re.captures(s) {
-        Some(caps) => caps,
-        None => return Err(utils::command_error("erreur captures regex")),
-    };
-
-    let number = match caps.name("number") {
-        Some(n) => n.as_str(),
-        None => "1",
-    }
-    .parse::<i64>()?;
-    if !(1..=100).contains(&number) {
-        return Err(utils::command_error(
-            "le nombre de dés doit appartenir à [1; 200]",
-        ));
-    }
-    let size = match caps.name("size") {
-        Some(m) => m.as_str().parse::<i64>()?,
-        None => return Err(utils::command_error("erreur pas de taille de dé")),
-    };
-    if size <= 1 {
-        return Err(utils::command_error(
-            "la taille du dé doit être supérieure strictement à 1",
-        ));
-    }
-    let modifier = match caps.name("modifier") {
-        Some(n) => n.as_str(),
-        None => "0",
-    }
-    .parse::<i64>()?;
-    let dk: DropKeep = DropKeep::from_str(match caps.name("dk") {
-        Some(m) => m.as_str(),
-        None => "",
-    })?;
-    let dk_val = match caps.name("dk_val") {
-        Some(m) => Some(m.as_str().parse::<usize>()?),
-        None => None,
-    };
-    if dk.is_some() && dk_val.is_none() {
-        return Err(utils::command_error("valeur attendu après le drop/keep"));
-    }
-    let roll = Roll::builder(number, size, modifier, dk, dk_val);
-    Ok(roll)
-}
-
-pub fn run(roll: Roll) -> String {
-    let (n, size, modifier, dk, dk_val) = roll.values();
-    let start = start_message(&roll);
-    let mut rolls: Vec<i64> = Vec::new();
-    let mut rng = rand::thread_rng();
-
-    for _ in 0..n {
-        rolls.push(rng.gen_range(1..=size));
-    }
-
-    let initial_roll = rolls_str(&rolls, modifier);
-
-    match dk {
-        DropKeep::DL => {
-            dl_str(rolls, n, modifier, dk_val.unwrap(), initial_roll, start)
-        }
-        DropKeep::KH => {
-            let val = (n as usize).checked_sub(dk_val.unwrap());
-            match val {
-                Some(x) => dl_str(rolls, n, modifier, x, initial_roll, start),
-                None => "la valeur de drop/keep doit être inférieure ou égale au nombre de dé".to_string()
-            }
-        }
-        DropKeep::DH => {
-            dh_str(rolls, n, modifier, dk_val.unwrap(), initial_roll, start)
-        }
-        DropKeep::KL => {
-            let val = (n as usize).checked_sub(dk_val.unwrap());
-            match val {
-                Some(x) => dh_str(rolls, n, modifier, x, initial_roll, start),
-                None => "la valeur de drop/keep doit être inférieure ou égale au nombre de dé".to_string()
-            }
-        }
-        DropKeep::None => {
-            let res = rolls.iter().sum::<i64>() + modifier;
-            final_str(start, res, initial_roll, n, modifier)
-        }
-    }
-}
-
-fn dh_str(rolls: Vec<i64>, n: i64, modifier: i64, dk_val: usize, initial_roll: String, start: String) -> String {
-    dk_str(drop_high(rolls, dk_val), n, modifier, initial_roll, start)
-}
-
-fn dl_str(rolls: Vec<i64>, n: i64, modifier: i64, dk_val: usize, initial_roll: String, start: String) -> String {
-    dk_str(drop_low(rolls, dk_val), n, modifier, initial_roll, start)
-}
-
-fn dk_str(dk_rolls: Vec<i64>, n: i64, modifier: i64, initial_roll: String, start: String) -> String {
-    let new_rolls = format!("({initial_roll}) -> {}", rolls_str(&dk_rolls, modifier));
-    let res = sum(dk_rolls, modifier);
-    final_str(start, res, new_rolls, n, modifier)
-}
-
-fn final_str(start: String, res: i64, rolls: String, n: i64, modifier: i64) -> String {
-    if modifier == 0 && n == 1 {
-        format!("{start} {res}")
-    } else {
-        format!("{start} {rolls} = {res}")
-    }
-}
-
-fn sum(rolls: Vec<i64>, modifier: i64) -> i64 {
+fn sum(rolls: &[i64], modifier: i64) -> i64 {
     rolls.iter().sum::<i64>() + modifier
+}
+
+fn show_res(roll: String, res: String, number: i64, modifier: i64) -> String {
+    if number == 1 && modifier == 0 {
+        res
+    } else {
+        format!("{roll} = {res}")
+    }
 }
 
 fn rolls_str(rolls: &[i64], modifier: i64) -> String {
     add_modifier(
         rolls
             .iter()
-            .map(|r| r.to_string())
+            .map(std::string::ToString::to_string)
             .collect::<Vec<String>>()
             .join(" + "),
         modifier,
     )
 }
 
-fn drop_low(mut rolls: Vec<i64>, n: usize) -> Vec<i64> {
+fn drop_low(mut rolls: Vec<i64>, n: i64) -> Vec<i64> {
     let bad_elements = rolls
         .clone()
         .into_iter()
         .sorted()
         .rev()
-        .skip(rolls.len() - n)
+        .skip(rolls.len() - (n as usize))
         .collect::<Vec<i64>>();
     for elem in bad_elements {
+        // each element is necessary inside iterator so unwrap is safe
         let index = rolls.clone().into_iter().position(|e| e == elem).unwrap();
         rolls.remove(index);
     }
     rolls
 }
 
-fn drop_high(mut rolls: Vec<i64>, n: usize) -> Vec<i64> {
+fn drop_high(mut rolls: Vec<i64>, n: i64) -> Vec<i64> {
     let bad_elements = rolls
         .clone()
         .into_iter()
         .sorted()
-        .skip(rolls.len() - n)
+        .skip(rolls.len() - (n as usize))
         .collect::<Vec<i64>>();
     for elem in bad_elements {
+        // each element is necessary inside iterator so unwrap is safe
         let index = rolls.clone().into_iter().position(|e| e == elem).unwrap();
         rolls.remove(index);
     }
     rolls
-}
-
-fn start_message(roll: &Roll) -> String {
-    let (n, size, modifier, dk, dk_val) = roll.values();
-    let show_mod = match modifier.cmp(&0) {
-        Ordering::Greater => format!("+{modifier}"),
-        Ordering::Less => modifier.to_string(),
-        Ordering::Equal => String::new(),
-    };
-    let dk_val = if let Some(x) = dk_val {
-        x.to_string()
-    } else {
-        String::new()
-    };
-    format!("`[r {n}d{size}{show_mod}{dk}{dk_val}]`")
 }
 
 fn add_modifier(s: String, modifier: i64) -> String {
@@ -291,7 +377,7 @@ fn add_modifier(s: String, modifier: i64) -> String {
     }
 }
 
-fn get_dk(s: impl ToString) -> Result<(DropKeep, Option<usize>), CommandError> {
+fn get_dk(s: impl ToString) -> Result<(DropKeep, Option<i64>), CommandError> {
     // default case
     if s.to_string().is_empty() {
         return Ok((DropKeep::None, None));
@@ -308,7 +394,7 @@ fn get_dk(s: impl ToString) -> Result<(DropKeep, Option<usize>), CommandError> {
         None => "",
     })?;
     let dk_val = match caps.name("dk_val") {
-        Some(m) => Some(m.as_str().parse::<usize>()?),
+        Some(m) => Some(m.as_str().parse::<i64>()?),
         None => None,
     };
     if dk.is_some() && dk_val.is_none() {
@@ -351,10 +437,16 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
         }
     }
     let (dk, dk_val) = get_dk(init_dk).unwrap_or((DropKeep::None, None));
-    let roll = Roll::builder(n, size, modifier, dk, dk_val);
+    let r = RollBuilder::new()
+        .number(n)
+        .size(size)
+        .modifier(modifier)
+        .drop_keep(dk)
+        .drop_keep_value(dk_val)
+        .build();
 
     InteractionResponse::Message(InteractionMessage {
-        content: run(roll),
+        content: r.roll().to_string(),
         ephemeral: false,
         embed: None,
     })
