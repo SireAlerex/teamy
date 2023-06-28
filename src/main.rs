@@ -5,6 +5,7 @@ pub mod db;
 mod loops;
 mod message;
 pub mod utils;
+pub mod web_scraper;
 
 use anyhow::anyhow;
 use serenity::async_trait;
