@@ -1,44 +1,46 @@
-use std::{error::Error, fmt::{Display, Formatter}};
-
 use scraper::{Html, Selector};
+use std::{
+    error::Error,
+    fmt::{Display, Formatter},
+};
 
 static LINK_STARTS: &str = "https://forum.paradoxplaza.com/forum/developer-diary";
 
-#[derive(Debug)]
-pub enum ScraperError<'a> {
-    Reqwest(reqwest::Error),
-    Scraper(scraper::error::SelectorErrorKind<'a>),
+#[derive(Debug, Clone)]
+pub enum ScraperError {
+    Reqwest(String),
+    Scraper(String),
     Custom(String),
 }
 
-impl<'a> ScraperError<'a> {
-    pub fn new(s: String) -> ScraperError<'a> {
+impl ScraperError {
+    pub fn new(s: String) -> ScraperError {
         ScraperError::Custom(s)
     }
 }
 
-impl<'a> Display for ScraperError<'a> {
+impl Display for ScraperError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         let s = "bla";
         write!(f, "{s}")
     }
 }
 
-impl<'a> Error for ScraperError<'a> {}
+impl Error for ScraperError {}
 
-impl<'a> From<reqwest::Error> for ScraperError<'a> {
+impl From<reqwest::Error> for ScraperError {
     fn from(e: reqwest::Error) -> Self {
-        ScraperError::Reqwest(e)
+        ScraperError::Reqwest(e.to_string())
     }
 }
 
-impl<'a> From<scraper::error::SelectorErrorKind<'a>> for ScraperError<'a> {
-    fn from(e: scraper::error::SelectorErrorKind<'a>) -> Self {
-        ScraperError::Scraper(e)
+impl From<scraper::error::SelectorErrorKind<'_>> for ScraperError {
+    fn from(e: scraper::error::SelectorErrorKind<'_>) -> Self {
+        ScraperError::Scraper(e.to_string())
     }
 }
 
-pub async fn pdx_scraper<'a>(url: &str) -> Result<Option<String>, ScraperError<'a>> {
+pub async fn pdx_scraper(url: &str) -> Result<Option<String>, ScraperError> {
     let response = reqwest::get(url).await?;
     let body = response.text().await?;
     let document = Html::parse_document(&body);
@@ -46,6 +48,9 @@ pub async fn pdx_scraper<'a>(url: &str) -> Result<Option<String>, ScraperError<'
     let div_selector = Selector::parse("div.buttonGroup a")?;
 
     if let Some(elem) = document.select(&div_selector).nth(1) {
+        if !elem.inner_html().contains("Next dev diary") {
+            return Ok(None);
+        }
         let link = format!(
             "https://forum.paradoxplaza.com{}",
             elem.value()
@@ -84,7 +89,10 @@ mod test {
         assert!(all_ok);
         let all_some = results.iter().all(|res| res.as_ref().unwrap().is_some());
         assert!(all_some);
-        let res_links = results.iter().map(|res| res.as_ref().unwrap().as_ref().unwrap()).collect::<Vec<&String>>();
+        let res_links = results
+            .iter()
+            .map(|res| res.as_ref().unwrap().as_ref().unwrap())
+            .collect::<Vec<&String>>();
         let expected_links = &[
             &"https://forum.paradoxplaza.com/forum/developer-diary/europa-universalis-iv-development-diary-20th-of-june-2023-1-35-4-release-history-lessons-dlc.1590980/".to_string(),
             &"https://forum.paradoxplaza.com/forum/developer-diary/victoria-3-dev-diary-90-update-1-3-5-changelog.1591304/".to_string(),

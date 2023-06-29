@@ -31,19 +31,22 @@ impl FromStr for DropKeep {
             return Ok(DropKeep::None);
         }
 
-        let re = regex::Regex::new(
-            r"(?P<dk>kh|kl|k|dh|dl|d)(?P<dk_val>\d+)",
-        )?;
+        let re = regex::Regex::new(r"(?P<dk>kh|kl|k|dh|dl|d)(?P<dk_val>\d+)")?;
         let caps = match re.captures(s) {
             Some(caps) => caps,
             None => return Err(utils::command_error("erreur captures regex")),
         };
-        
-        let dk = if let Some(m) = caps.name("dk") {m.as_str()} else {return Ok(DropKeep::None);};
+
+        let dk = if let Some(m) = caps.name("dk") {
+            m.as_str()
+        } else {
+            return Ok(DropKeep::None);
+        };
         let dk_val = match caps.name("dk_val") {
             Some(m) => m.as_str(),
             None => return Err(utils::command_error("erreur roll regex drop/keep : dk_val")),
-        }.parse::<u64>()?;
+        }
+        .parse::<u64>()?;
 
         match dk {
             "d" | "dl" => Ok(DropKeep::DL(dk_val)),
@@ -58,9 +61,9 @@ impl FromStr for DropKeep {
 impl std::fmt::Display for DropKeep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         let s = match self {
-            DropKeep::DL(x) => format!("d{x}"),            
+            DropKeep::DL(x) => format!("d{x}"),
             DropKeep::DH(x) => format!("dh{x}"),
-            DropKeep::KH(x) => format!("k{x}"),            
+            DropKeep::KH(x) => format!("k{x}"),
             DropKeep::KL(x) => format!("kl{x}"),
             DropKeep::None => String::new(),
         };
@@ -153,10 +156,7 @@ impl std::fmt::Display for Roll {
             Ordering::Equal => String::new(),
         };
 
-        let s = format!(
-            "`[r {}d{}{show_mod}{}]`",
-            self.number, self.size, self.dk
-        );
+        let s = format!("`[r {}d{}{show_mod}{}]`", self.number, self.size, self.dk);
         write!(f, "{s}")
     }
 }
@@ -203,7 +203,9 @@ impl FromStr for Roll {
 
         if let Some(x) = dk.get() {
             if x > number {
-                return Err(utils::command_error("valeur du drop/keep doit être <= nombre de dés"));
+                return Err(utils::command_error(
+                    "valeur du drop/keep doit être <= nombre de dés",
+                ));
             }
         }
 
@@ -416,7 +418,11 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
     let dk = if let Ok(d) = DropKeep::from_str(&init_dk) {
         d
     } else {
-        return InteractionResponse::Message(InteractionMessage { content: "erreur dk".to_string(), ephemeral: true, embed: None });
+        return InteractionResponse::Message(InteractionMessage {
+            content: "erreur dk".to_string(),
+            ephemeral: true,
+            embed: None,
+        });
     };
 
     let r = RollBuilder::new()
@@ -472,7 +478,12 @@ mod test {
     use super::*;
     #[test]
     fn test_roll() {
-        let d6 = Roll {number: 1, size: 6, modifier: 0, dk: DropKeep::None};
+        let d6 = Roll {
+            number: 1,
+            size: 6,
+            modifier: 0,
+            dk: DropKeep::None,
+        };
         // default roll
         assert_eq!(Roll::new(), d6);
 
@@ -481,13 +492,41 @@ mod test {
         assert_eq!(default_roll, d6);
 
         let basic_roll_pos = RollBuilder::default().modifier(2).build();
-        assert_eq!(basic_roll_pos, Roll {number: 1, size: 6, modifier: 2, dk: DropKeep::None});
+        assert_eq!(
+            basic_roll_pos,
+            Roll {
+                number: 1,
+                size: 6,
+                modifier: 2,
+                dk: DropKeep::None
+            }
+        );
 
         let basic_roll_neg = RollBuilder::default().modifier(-2).build();
-        assert_eq!(basic_roll_neg, Roll {number: 1, size: 6, modifier: -2, dk: DropKeep::None});
+        assert_eq!(
+            basic_roll_neg,
+            Roll {
+                number: 1,
+                size: 6,
+                modifier: -2,
+                dk: DropKeep::None
+            }
+        );
 
-        let dk_roll = RollBuilder::default().number(4).size(20).drop_keep(DropKeep::KH(3)).build();
-        assert_eq!(dk_roll, Roll {number: 4, size: 20, modifier: 0, dk: DropKeep::KH(3)});
+        let dk_roll = RollBuilder::default()
+            .number(4)
+            .size(20)
+            .drop_keep(DropKeep::KH(3))
+            .build();
+        assert_eq!(
+            dk_roll,
+            Roll {
+                number: 4,
+                size: 20,
+                modifier: 0,
+                dk: DropKeep::KH(3)
+            }
+        );
 
         assert!(Roll::from_str("d6").is_ok());
         assert!(Roll::from_str("d4+2").is_ok());

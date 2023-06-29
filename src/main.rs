@@ -36,6 +36,8 @@ use crate::commands::general;
 use crate::commands::general::{based::*, bonjour::*, id::*, nerd::*, ping::*, roll::*, slide::*};
 use crate::commands::macros;
 use crate::commands::macros::{add::*, clear::*, del::*, edit::*, show::*};
+// use crate::commands::pdx;
+use crate::commands::pdx::dd::*;
 
 struct ShardManagerContainer;
 
@@ -265,6 +267,11 @@ struct Macro;
 #[commands(basé, bonjour, ping, slide, nerd, id, roll)]
 struct General;
 
+#[group]
+#[prefix = "pdx"]
+#[commands(dd)]
+struct Pdx;
+
 #[help]
 #[individual_command_tip = "Pour obtenir plus d'informations à propos d'une commande, utilisez la commande en argument."]
 #[command_not_found_text = "Commande non trouvée : '{}'."]
@@ -328,9 +335,10 @@ async fn serenity(
         .after(after)
         .help(&MY_HELP)
         .group(&GENERAL_GROUP)
-        .group(&MACRO_GROUP);
+        .group(&MACRO_GROUP)
+        .group(&PDX_GROUP);
 
-    let static_groups = vec![&GENERAL_GROUP, &MACRO_GROUP];
+    let static_groups = vec![&GENERAL_GROUP, &MACRO_GROUP, &PDX_GROUP];
     let mut groups: Vec<CommandGroupInfo> = Vec::default();
     for group in static_groups {
         let mut commands: Vec<CommandInfo> = Vec::default();
