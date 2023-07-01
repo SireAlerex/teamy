@@ -42,8 +42,8 @@ pub async fn find_message(
     }
 }
 
-pub fn first_letter(s: &str) -> char {
-    s.chars().next().unwrap()
+pub fn first_letter(s: &str) -> Option<char> {
+    s.chars().next()
 }
 
 pub fn remove_suffix(s: &str) -> String {

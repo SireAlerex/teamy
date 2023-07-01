@@ -80,7 +80,7 @@ async fn add_temp_macro(
 
     match utils::first_letter(&msg.content) {
         // macro call
-        '!' => {
+        Some('!') => {
             // find macro in db
             let filter =
                 doc! {"user_id": msg.author.id.to_string(), "name": msg.content.strip_prefix('!')};
@@ -93,6 +93,8 @@ async fn add_temp_macro(
                 Err(utils::command_error("macro non trouvée"))
             }
         }
+        // empty message
+        None => Err(utils::command_error("bad message")),
         // command message
         _ => {
             if msg.content.starts_with("`[r") {

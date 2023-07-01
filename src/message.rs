@@ -66,13 +66,13 @@ fn bot(message: &str) -> bool {
 }
 
 fn ou(message: &str) -> Option<&str> {
-    let options: Vec<&str> = message.split(" ou ").collect();
+    let mut options = message.split(" ou ");
     let re = match regex::Regex::new(r"bot|robot|teamy") {
         Ok(r) => r,
         Err(_) => return None,
     };
-    let a = re.split(options[0]).last()?;
-    let b = re.split(options[1]).next()?;
+    let a = re.split(options.next()?).last()?;
+    let b = re.split(options.next()?).next()?;
     Some(choose(&[a, b]))
 }
 

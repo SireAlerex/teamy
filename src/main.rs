@@ -100,8 +100,8 @@ impl EventHandler for Bot {
             return;
         }
         let content = match utils::first_letter(&msg.content) {
-            '$' => String::new(), // do nothing if command
-            '!' => commands::macros::r#macro::handle_macro(&ctx, &msg).await,
+            Some('$') | None => String::new(), // do nothing if command or empty message
+            Some('!') => commands::macros::r#macro::handle_macro(&ctx, &msg).await,
             _ => message::handle_reaction(&ctx, &msg).await,
         };
         utils::say_or_error(&ctx, msg.channel_id, &content).await;
