@@ -82,8 +82,8 @@ pub fn admin_command(command: &ApplicationCommandInteraction) -> bool {
     }
 }
 
-pub async fn say_or_error(ctx: &Context, channel_id: ChannelId, content: impl ToString) {
-    let content = content.to_string();
+pub async fn say_or_error<T: Into<String>>(ctx: &Context, channel_id: ChannelId, content: T) {
+    let content = content.into();
     if content.is_empty() {
         return;
     };
@@ -95,17 +95,16 @@ pub async fn say_or_error(ctx: &Context, channel_id: ChannelId, content: impl To
     }
 }
 
-pub fn command_error(message: impl ToString) -> CommandError {
-    Box::<dyn std::error::Error + Send + Sync>::from(message.to_string())
+pub fn command_error<T: Into<String>>(message: T) -> CommandError {
+    Box::<dyn std::error::Error + Send + Sync>::from(message.into())
 }
 
-pub fn mongodb_error_message(message: &impl ToString) -> Option<String> {
+pub fn mongodb_error_message(message: &str) -> Option<String> {
     let re = match regex::Regex::new(r"error:(.*),") {
         Ok(r) => r,
         Err(_) => return None,
     };
-    let s = &message.to_string();
-    re.captures(s).map(|capture| capture[1].to_string())
+    re.captures(message).map(|capture| capture[1].to_string())
 }
 
 pub async fn get_temp_chan(ctx: &Context) -> Option<ChannelId> {
@@ -121,12 +120,11 @@ pub async fn get_temp_chan(ctx: &Context) -> Option<ChannelId> {
     Some(*temp_chan)
 }
 
-pub fn get_option(data: &CommandDataOption, name: impl ToString) -> Option<&Value> {
+pub fn get_option<'a>(data: &'a CommandDataOption, name: &str) -> Option<&'a Value> {
     data.options
-        .iter()
-        .find(|o| o.name == name.to_string())?
-        .value
-        .as_ref()
+         .iter()
+         .find(|o| o.name == name.to_string())?
+         .value.as_ref()
 }
 
 pub async fn interaction_response_message(

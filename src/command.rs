@@ -26,28 +26,28 @@ impl TypeMapKey for CommandGroupsContainer {
     type Value = Arc<tokio::sync::Mutex<CommandGroups>>;
 }
 
-impl CommandGroupInfo {
-    pub fn find_command(&self, name: &impl ToString) -> Option<&CommandInfo> {
+impl CommandGroupInfo {    
+    pub fn find_command(&self, name: &str) -> Option<&CommandInfo> {
         self.commands
             .iter()
-            .find(|c: &&CommandInfo| c.names.iter().any(|&s| *s == name.to_string()))
+            .find(|c: &&CommandInfo| c.names.iter().any(|&s| s == name))
     }
 }
 
-impl CommandGroups {
-    pub fn find_group(&self, command_name: impl ToString) -> Option<&CommandGroupInfo> {
+impl CommandGroups {    
+    pub fn find_group(&self, command_name: &str) -> Option<&CommandGroupInfo> {
         self.groups
             .iter()
-            .find(|group| group.find_command(&command_name).is_some())
+            .find(|group| group.find_command(command_name).is_some())
     }
-
-    pub fn find_command(&self, name: impl ToString) -> Option<&CommandInfo> {
+    
+    pub fn find_command(&self, name: &str) -> Option<&CommandInfo> {
         if let Some(group) = self
             .groups
             .iter()
-            .find(|group| group.find_command(&name).is_some())
+            .find(|group| group.find_command(name).is_some())
         {
-            group.find_command(&name)
+            group.find_command(name)
         } else {
             None
         }

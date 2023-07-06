@@ -59,10 +59,10 @@ impl Guild {
     }
 }
 
-pub fn mongodb_error(message: impl ToString) -> Error {
+pub fn mongodb_error<T: Into<String>>(message: T) -> Error {
     Error::from(std::io::Error::new(
         std::io::ErrorKind::Other,
-        message.to_string(),
+        message.into(),
     ))
 }
 

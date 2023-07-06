@@ -111,9 +111,9 @@ async fn add_temp_macro(
     }
 }
 
-fn roll_args(s: impl ToString) -> Result<String, CommandError> {
+fn roll_args(s: &str) -> Result<String, CommandError> {
     let re = regex::Regex::new(r"\[r (?P<args>.*)\]")?;
-    let s = &s.to_string();
+    // let s = &s.to_string();
     let caps = match re.captures(s) {
         Some(caps) => caps,
         None => return Err(utils::command_error("erreur captures regex")),
