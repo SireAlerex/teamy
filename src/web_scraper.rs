@@ -1,15 +1,17 @@
+use futures::StreamExt;
 use scraper::{Html, Selector};
 use std::{
     error::Error,
     fmt::{Display, Formatter},
 };
 
-static LINK_STARTS: &str = "https://forum.paradoxplaza.com/forum/developer-diary";
+static NEXT_DD: &str = "next dev diary";
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum ScraperError {
-    Reqwest(String),
+    Reqwest(reqwest::Error),
     Scraper(String),
+    FromUtf8(std::str::Utf8Error),
     Custom(String),
 }
 
@@ -30,41 +32,49 @@ impl Error for ScraperError {}
 
 impl From<reqwest::Error> for ScraperError {
     fn from(e: reqwest::Error) -> Self {
-        ScraperError::Reqwest(e.to_string())
+        ScraperError::Reqwest(e)
     }
 }
 
-impl From<scraper::error::SelectorErrorKind<'_>> for ScraperError {
-    fn from(e: scraper::error::SelectorErrorKind<'_>) -> Self {
+impl<'a> From<scraper::error::SelectorErrorKind<'a>> for ScraperError {
+    fn from(e: scraper::error::SelectorErrorKind) -> Self {
         ScraperError::Scraper(e.to_string())
     }
 }
 
-pub async fn pdx_scraper(url: &str) -> Result<Option<String>, ScraperError> {
-    let response = reqwest::get(url).await?;
-    let body = response.text().await?;
-    let document = Html::parse_document(&body);
-
-    let div_selector = Selector::parse("div.buttonGroup a")?;
-
-    if let Some(elem) = document.select(&div_selector).nth(1) {
-        if !elem.inner_html().contains("Next dev diary") {
-            return Ok(None);
-        }
-        let link = format!(
-            "https://forum.paradoxplaza.com{}",
-            elem.value()
-                .attr("href")
-                .ok_or(ScraperError::new("href error".to_string()))?
-        );
-        if link.contains(LINK_STARTS) {
-            Ok(Some(link))
-        } else {
-            Err(ScraperError::new(format!("mauvais lien : {link}")))
-        }
-    } else {
-        Ok(None)
+impl From<std::str::Utf8Error> for ScraperError {
+    fn from(e: std::str::Utf8Error) -> Self {
+        ScraperError::FromUtf8(e)
     }
+}
+
+pub async fn pdx_scraper(url: String, client: &reqwest::Client) -> Result<Option<String>, ScraperError> {
+    let response = client.get(url).send().await?;
+    let div_selector = Selector::parse("a.pagenav-jump--next")?;
+    let mut stream = response.bytes_stream();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = &chunk?.to_ascii_lowercase();
+        if chunk.windows(NEXT_DD.len()).all(|w| w != NEXT_DD.as_bytes()) {
+            continue;
+        }
+
+        let r = std::str::from_utf8(chunk)?;
+        let doc = Html::parse_document(r);
+        for elem in doc.select(&div_selector) {
+            if !elem.inner_html().contains(NEXT_DD) {
+                continue;
+            }
+            return Ok(Some(format!(
+                "https://forum.paradoxplaza.com{}",
+                elem.value()
+                    .attr("href")
+                    .ok_or_else(|| ScraperError::new("href error".to_string()))?
+            )));
+        }
+    }
+
+    Ok(None)
 }
 
 #[cfg(test)]
@@ -82,8 +92,9 @@ mod test {
             "https://forum.paradoxplaza.com/forum/developer-diary/dev-diary-18-dragon-lords.1589296/"
         ];
         let mut results = Vec::new();
+        let client = reqwest::Client::default();
         for link in ref_links {
-            results.push(pdx_scraper(link).await);
+            results.push(pdx_scraper(link.to_string(), &client).await);
         }
         let all_ok = results.iter().all(|res| res.is_ok());
         assert!(all_ok);

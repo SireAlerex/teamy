@@ -6,8 +6,6 @@ use serenity::framework::standard::CommandError;
 use serenity::framework::standard::{macros::command, Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use std::sync::Arc;
-use tokio::task::JoinHandle;
 
 #[command]
 #[description = "Affiche les derniers Dev Diaries de Paradox"]
@@ -27,40 +25,29 @@ async fn pdx_links(ctx: &Context) -> Result<PdxLinks, CommandError> {
 }
 
 async fn check_links(pdx: &PdxLinks) -> Result<Vec<(PdxGame, Option<String>)>, CommandError> {
-    let results: Arc<Mutex<Vec<(PdxGame, Result<Option<String>, web_scraper::ScraperError>)>>> =
-        Arc::new(tokio::sync::Mutex::new(Vec::new()));
-    let mut handles: Vec<JoinHandle<()>> = vec![];
+    let mut results: Vec<(PdxGame, Result<Option<String>, web_scraper::ScraperError>)> = Vec::new();
+    let mut handles = Vec::new();
+    let client = reqwest::Client::default();
     // for each (game, latest_link) return (game, option<link>) which is some if a more recent one exist or none else
     for (game, link) in pdx.all_latest() {
-        let results = Arc::clone(&results);
-        let t = tokio::spawn(async move {
-            let web = web_scraper::pdx_scraper(&link).await;
-            let mut r = results.as_ref().lock().await;
-            r.push((game, web));
-        });
-        handles.push(t);
+        let client_loop = client.clone();
+        handles.push(tokio::spawn(async move {
+            let web = web_scraper::pdx_scraper(link, &client_loop).await;
+            (game, web)
+        }));
     }
 
     for handle in handles {
-        handle.await.unwrap();
+        results.push(handle.await.unwrap());
     }
-    let res = results.lock().await.to_vec();
-    if res.iter().any(|r| r.1.is_err()) {
-        // can unwrap since we found an error
-        let first_err = res
-            .iter()
-            .find(|r| r.1.is_err())
-            .unwrap()
-            .1
-            .clone()
-            .unwrap_err();
+    if let Some((_, err)) = results.iter().find(|(_, res)| res.is_err()) {
         Err(utils::command_error(format!(
-            "link threaded error : {first_err}"
+            "link threaded error : {}", err.as_ref().unwrap_err()
         )))
     } else {
-        let res: Vec<(PdxGame, Option<String>)> =
-            res.into_iter().map(|r| (r.0, r.1.unwrap())).collect();
-        Ok(res)
+        Ok(results.into_iter()
+            .map(|(game, res)| (game, res.unwrap_or(None)))
+            .collect())
     }
 }
 
