@@ -19,9 +19,10 @@ pub async fn basé(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 fn based<'a>() -> &'a str {
-    match rand::random::<bool>() {
-        true => "Basé",
-        false => "Cringe",
+    if rand::random::<bool>() {
+        "Basé"
+    } else {
+        "Cringe"
     }
 }
 
@@ -34,7 +35,7 @@ pub async fn run_message(
             let message_id = target_id.to_message_id();
             match command.channel_id.message(&ctx.http, message_id).await {
                 Ok(message) => format!("\"{}\"\n{}", message.content, based()),
-                Err(e) => format!("Erreur pour trouver le message ({}) : {}", message_id, e),
+                Err(e) => format!("Erreur pour trouver le message ({message_id}) : {e}"),
             }
         }
         None => String::from("Erreur pour accéder au MessageId de l'interaction"),

@@ -48,14 +48,20 @@ impl From<std::str::Utf8Error> for ScraperError {
     }
 }
 
-pub async fn pdx_scraper(url: String, client: &reqwest::Client) -> Result<Option<String>, ScraperError> {
+pub async fn pdx_scraper(
+    url: String,
+    client: &reqwest::Client,
+) -> Result<Option<String>, ScraperError> {
     let response = client.get(url).send().await?;
     let div_selector = Selector::parse("a.pagenav-jump--next")?;
     let mut stream = response.bytes_stream();
 
     while let Some(chunk) = stream.next().await {
         let chunk = &chunk?.to_ascii_lowercase();
-        if chunk.windows(NEXT_DD.len()).all(|w| w != NEXT_DD.as_bytes()) {
+        if chunk
+            .windows(NEXT_DD.len())
+            .all(|w| w != NEXT_DD.as_bytes())
+        {
             continue;
         }
 

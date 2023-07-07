@@ -72,12 +72,10 @@ pub struct GameLinks {
 }
 
 impl GameLinks {
-    pub fn update(&mut self, new_link: String) -> Self {
-        Self {
-            game: self.game,
-            latest: new_link,
-            previous: self.latest.clone(),
-        }
+    pub fn update(&mut self, new_link: String) -> &mut Self {
+        self.previous = self.latest.clone();
+        self.latest = new_link;
+        self
     }
 
     pub fn embed_value(&self) -> (String, String) {
@@ -116,21 +114,13 @@ impl PdxLinks {
             .collect()
     }
 
-    pub fn update(&mut self, game: &PdxGame, new_link: String) -> Result<(), String> {
-        self.games = self
-            .games
-            .clone()
-            .into_iter()
-            .map(|mut gl| {
-                if gl.game == *game {
-                    gl.update(new_link.clone())
-                } else {
-                    gl
-                }
-            })
-            .collect();
-
-        Ok(())
+    pub fn update(&mut self, game: PdxGame, new_link: &str) -> Result<(), String> {
+        if let Some(gl) = self.games.iter_mut().find(|gl| gl.game == game) {
+            gl.update(new_link.to_string());
+            Ok(())
+        } else {
+            Err(format!("Le jeu {game:?} ne fait pas partie du PdxLinks"))
+        }
     }
 
     // reset function

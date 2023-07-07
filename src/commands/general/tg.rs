@@ -21,15 +21,12 @@ async fn toggle_mute<
     collection: &str,
     object: T,
 ) -> Result<bool, mongodb::error::Error> {
-    match db::is_object_in_coll(ctx, collection, &object).await? {
-        true => {
-            db::delete(ctx, collection, &object).await?;
-            Ok(true)
-        }
-        false => {
-            db::insert(ctx, collection, &object).await?;
-            Ok(false)
-        }
+    if db::is_object_in_coll(ctx, collection, &object).await? {
+        db::delete(ctx, collection, &object).await?;
+        Ok(true)
+    } else {
+        db::insert(ctx, collection, &object).await?;
+        Ok(false)
     }
 }
 

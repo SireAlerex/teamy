@@ -51,7 +51,7 @@ pub async fn run_message(
             let message_id = target_id.to_message_id();
             match command.channel_id.message(&ctx.http, message_id).await {
                 Ok(message) => format!("{} -{}", run(&message.content), message.author.name),
-                Err(e) => format!("Erreur pour trouver le message ({}) : {}", message_id, e),
+                Err(e) => format!("Erreur pour trouver le message ({message_id}) : {e}"),
             }
         }
         None => String::from("Erreur pour accéder au MessageId de l'interaction"),

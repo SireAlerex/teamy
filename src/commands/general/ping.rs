@@ -18,10 +18,14 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 async fn latency(ctx: &Context) -> String {
-    match utils::runner_latency(Arc::new(ctx.clone())).await {
-        Some(l) => format!("Pong ! ``{:#?}``", l),
-        None => "Pong ! (il y a un problème pour accéder à la latence du bot, veuillez réessayer dans 1min)".to_string()
-    }
+    let res = match utils::RunnerInfo::info(Arc::new(ctx.clone())).await {
+        Ok(runnner) => match runnner.latency {
+            Some(ping) => format!("``{ping:#?}``"),
+            None => "(il y a un problème pour accéder à la latence du bot, veuillez réessayer dans 1min)".to_string()
+        },
+        Err(e) => format!("(une erreur s'est produite : {e}")
+    };
+    format!("Pong ! {res}")
 }
 
 pub async fn run(ctx: &Context) -> InteractionResponse {

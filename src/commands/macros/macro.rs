@@ -76,11 +76,10 @@ pub async fn test_macro(
     command: &str,
     args: &Option<String>,
 ) -> Result<(), CommandError> {
-    let temp_chan = if let Some(id) = utils::get_temp_chan(ctx).await {
-        id
-    } else {
+    let Some(temp_chan) = utils::get_temp_chan(ctx).await else {
         return Err(utils::command_error("erreur lors du test de la macro"));
     };
+
     let msg = match command {
         "roll" => {
             roll::roll_intern(

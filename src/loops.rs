@@ -12,15 +12,19 @@ pub async fn log_system_load(ctx: Arc<Context>) {
     let time = Local::now().to_rfc2822();
     let cpu_load = sys_info::loadavg().unwrap();
     let mem_use = sys_info::mem_info().unwrap();
-    let latency = utils::runner_latency(Arc::clone(&ctx)).await;
+    let latency = if let Ok(runner) = utils::RunnerInfo::info(Arc::clone(&ctx)).await {
+        runner.latency
+    } else {
+        error!("There was a problem getting runner info of shard");
+        return;
+    };
 
     let data = ctx.data.read().await;
-    let log_chan_id = match data.get::<LogChanIdContainer>() {
-        Some(id) => id,
-        None => {
-            error!("There was a problem getting the log chan id");
-            return;
-        }
+    let log_chan_id = if let Some(id) = data.get::<LogChanIdContainer>() {
+        id
+    } else {
+        error!("There was a problem getting the log chan id");
+        return;
     }
     .lock()
     .await;
@@ -39,24 +43,24 @@ pub async fn log_system_load(ctx: Arc<Context>) {
                         "Memory Usage",
                         format!(
                             "{:.1}% ({:.2} MB Free out of {:.2} MB)",
-                            (((mem_use.total as f32 / 1024.0) - (mem_use.free as f32 / 1024.0))
-                                / (mem_use.total as f32 / 1024.0))
+                            (((mem_use.total as f64 / 1024.0) - (mem_use.free as f64 / 1024.0))
+                                / (mem_use.total as f64 / 1024.0))
                                 * 100.0,
-                            mem_use.free as f32 / 1024.0,
-                            mem_use.total as f32 / 1024.0
+                            mem_use.free as f64 / 1024.0,
+                            mem_use.total as f64 / 1024.0
                         ),
                         false,
                     )
-                    .field("Latency", format!("{:?}", latency), false)
+                    .field("Latency", format!("{latency:?}"), false)
             })
         })
         .await;
     if let Err(why) = message {
-        error!("Error sending message: {:?}", why);
+        error!("Error sending message: {why:?}");
     };
 }
 
-pub async fn status_loop(ctx: Arc<Context>) {
+pub fn status_loop(ctx: &Arc<Context>) {
     let game = *consts::GAME_POOL.iter().choose(&mut thread_rng()).unwrap();
     ctx.shard.set_activity(Some(Activity::playing(game)));
 }

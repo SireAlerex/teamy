@@ -33,11 +33,16 @@ use tracing::{error, info};
 
 use crate::command::{CommandGroupInfo, CommandGroups, CommandGroupsContainer, CommandInfo};
 use crate::commands::general;
-use crate::commands::general::{based::*, bonjour::*, id::*, nerd::*, ping::*, roll::*, slide::*};
+use crate::commands::general::{
+    based::BASÉ_COMMAND, bonjour::BONJOUR_COMMAND, id::ID_COMMAND, nerd::NERD_COMMAND,
+    ping::PING_COMMAND, roll::ROLL_COMMAND, slide::SLIDE_COMMAND,
+};
 use crate::commands::macros;
-use crate::commands::macros::{add::*, clear::*, del::*, edit::*, show::*};
-// use crate::commands::pdx;
-use crate::commands::pdx::dd::*;
+use crate::commands::macros::{
+    add::ADD_COMMAND, clear::CLEAR_COMMAND, del::DEL_COMMAND, edit::EDIT_COMMAND,
+    show::SHOW_COMMAND,
+};
+use crate::commands::pdx::dd::DD_COMMAND;
 
 struct ShardManagerContainer;
 
@@ -116,7 +121,7 @@ impl EventHandler for Bot {
 
             tokio::spawn(async move {
                 loop {
-                    loops::status_loop(Arc::clone(&ctx1)).await;
+                    loops::status_loop(&Arc::clone(&ctx1));
                     tokio::time::sleep(Duration::from_secs(60)).await;
                 }
             });
@@ -140,12 +145,11 @@ impl EventHandler for Bot {
         }
 
         let data = ctx.data.read().await;
-        let guild_group = match data.get::<GuildIdContainer>() {
-            Some(guild_group) => guild_group,
-            None => {
-                error!("There was a problem getting the guild id");
-                return;
-            }
+        let guild_group = if let Some(guild_group) = data.get::<GuildIdContainer>() {
+            guild_group
+        } else {
+            error!("There was a problem getting the guild id");
+            return;
         }
         .lock()
         .await;
@@ -232,10 +236,10 @@ impl EventHandler for Bot {
 
                 match result {
                     InteractionResponse::Message(interaction) => {
-                        utils::interaction_response_message(&ctx, &command, interaction).await
+                        utils::interaction_response_message(&ctx, &command, interaction).await;
                     }
                     InteractionResponse::Modal => {
-                        utils::interaction_response_modal(&ctx, &command).await
+                        utils::interaction_response_modal(&ctx, &command).await;
                     }
                     InteractionResponse::None => (),
                 }
@@ -303,7 +307,7 @@ async fn after(ctx: &Context, msg: &Message, command_name: &str, command_result:
                 msg.channel_id,
                 format!("Erreur lors de la commande : {why}"),
             )
-            .await
+            .await;
         }
     }
 }
@@ -313,9 +317,7 @@ async fn serenity(
     #[shuttle_secrets::Secrets] secret_store: SecretStore,
 ) -> shuttle_serenity::ShuttleSerenity {
     // Get the discord token set in `Secrets.toml`
-    let token = if let Some(token) = secret_store.get("DISCORD_TOKEN") {
-        token
-    } else {
+    let Some(token) = secret_store.get("DISCORD_TOKEN") else {
         return Err(anyhow!("'DISCORD_TOKEN' was not found").into());
     };
     let http = Http::new(&token);
@@ -327,7 +329,7 @@ async fn serenity(
 
             (owners, info.id)
         }
-        Err(why) => panic!("Could not access application info: {:?}", why),
+        Err(why) => panic!("Could not access application info: {why:?}"),
     };
 
     let framework = StandardFramework::new()
@@ -382,34 +384,28 @@ async fn serenity(
 
     let guild_group = GuildGroup { guilds };
 
-    let log_chan_id = if let Some(id) = secret_store.get("LOG_CHAN_ID") {
-        id
-    } else {
+    let Some(log_chan_id) = secret_store.get("LOG_CHAN_ID") else {
         return Err(anyhow!("'LOG_CHAN_ID' was not found").into());
     };
-    let log_chan_id = Arc::new(tokio::sync::Mutex::new(ChannelId(
+    let log_chan = Arc::new(tokio::sync::Mutex::new(ChannelId(
         log_chan_id.parse().expect("LOG_CHAN_ID should be u64"),
     )));
 
-    let db_uri = if let Some(uri) = secret_store.get("DATABASE_URI") {
-        uri
-    } else {
+    let Some(uri) = secret_store.get("DATABASE_URI") else {
         return Err(anyhow!("'DATABASE_URI' was not found").into());
     };
-    let db_uri = Arc::new(tokio::sync::Mutex::new(DatabaseUri { db_uri }));
+    let db_uri = Arc::new(tokio::sync::Mutex::new(DatabaseUri { db_uri: uri }));
 
-    let temp_chan = if let Some(channel_id) = secret_store.get("TEMP_CHAN") {
-        channel_id
-    } else {
+    let Some(temp_chan_id) = secret_store.get("TEMP_CHAN") else {
         return Err(anyhow!("'TEMP_CHAN' was not found").into());
     };
-    let temp_chan = ChannelId(temp_chan.parse().expect("TEMP_CHAN should be u64"));
+    let temp_chan = ChannelId(temp_chan_id.parse().expect("TEMP_CHAN should be u64"));
 
     {
         let mut data = client.data.write().await;
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
         data.insert::<GuildIdContainer>(Arc::new(tokio::sync::Mutex::new(guild_group)));
-        data.insert::<LogChanIdContainer>(Arc::clone(&log_chan_id));
+        data.insert::<LogChanIdContainer>(Arc::clone(&log_chan));
         data.insert::<CommandGroupsContainer>(Arc::new(tokio::sync::Mutex::new(groups)));
         data.insert::<DatabaseUriContainer>(Arc::clone(&db_uri));
         data.insert::<TempChanContainer>(Arc::new(tokio::sync::Mutex::new(temp_chan)));

@@ -38,8 +38,8 @@ pub async fn run_user(
 ) -> InteractionResponse {
     let result = match command.data.target_id {
         Some(target_id) => match target_id.to_user_id().to_user(&ctx.http).await {
-            Ok(user) => format!("L'id de {} est {}", user.tag(), target_id),
-            Err(e) => format!("Erreur avec l'id {} : {}", target_id, e),
+            Ok(user) => format!("L'id de {} est {target_id}", user.tag()),
+            Err(e) => format!("Erreur avec l'id {target_id} : {e}"),
         },
         None => String::from("Pas de TargetId dans l'interaction"),
     };

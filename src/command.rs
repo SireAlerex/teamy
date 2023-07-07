@@ -26,7 +26,7 @@ impl TypeMapKey for CommandGroupsContainer {
     type Value = Arc<tokio::sync::Mutex<CommandGroups>>;
 }
 
-impl CommandGroupInfo {    
+impl CommandGroupInfo {
     pub fn find_command(&self, name: &str) -> Option<&CommandInfo> {
         self.commands
             .iter()
@@ -34,13 +34,13 @@ impl CommandGroupInfo {
     }
 }
 
-impl CommandGroups {    
+impl CommandGroups {
     pub fn find_group(&self, command_name: &str) -> Option<&CommandGroupInfo> {
         self.groups
             .iter()
             .find(|group| group.find_command(command_name).is_some())
     }
-    
+
     pub fn find_command(&self, name: &str) -> Option<&CommandInfo> {
         if let Some(group) = self
             .groups

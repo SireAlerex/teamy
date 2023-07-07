@@ -24,6 +24,29 @@ use tracing::error;
 
 use crate::{InteractionMessage, ShardManagerContainer};
 
+pub struct RunnerInfo {
+    pub latency: Option<Duration>,
+    pub connection: Option<ConnectionStage>,
+}
+
+impl RunnerInfo {
+    pub async fn info<'a>(ctx: Arc<Context>) -> Result<Self, &'a str> {
+        let data = ctx.data.read().await;
+        let Some(shard_manager) = data.get::<ShardManagerContainer>() else {
+            return Err("There was a problem getting the shard manager");
+        };
+        let manager = shard_manager.lock().await;
+        let runners = manager.runners.lock().await;
+        let Some(runner) = runners.get(&ShardId(ctx.shard_id)) else {
+            return Err("No shard found");
+        };
+        Ok(RunnerInfo {
+            latency: runner.latency,
+            connection: Some(runner.stage),
+        })
+    }
+}
+
 pub async fn find_message(
     ctx: &Context,
     user: &User,
@@ -52,21 +75,24 @@ pub fn remove_suffix(s: &str) -> String {
     c.collect()
 }
 
-pub fn strip_prefix_suffix(s: String, c: char) -> String {
-    s.strip_prefix(c)
-        .unwrap()
-        .strip_suffix(c)
-        .unwrap()
-        .to_owned()
+pub fn strip_prefix_suffix(initial_string: &str, c: char) -> String {
+    let string_prefix = match initial_string.strip_prefix(c) {
+        Some(s) => s,
+        None => initial_string,
+    };
+    match string_prefix.strip_suffix(c) {
+        Some(s) => s.to_string(),
+        None => string_prefix.to_string(),
+    }
 }
 
 pub fn nerdify(text: &str) -> String {
     text.char_indices()
         .map(|(i, c)| {
-            if i % 2 != 0 {
-                c.to_ascii_uppercase()
-            } else {
+            if i % 2 == 0 {
                 c.to_ascii_lowercase()
+            } else {
+                c.to_ascii_uppercase()
             }
         })
         .collect()
@@ -100,21 +126,17 @@ pub fn command_error<T: Into<String>>(message: T) -> CommandError {
 }
 
 pub fn mongodb_error_message(message: &str) -> Option<String> {
-    let re = match regex::Regex::new(r"error:(.*),") {
-        Ok(r) => r,
-        Err(_) => return None,
+    let Ok(re) = regex::Regex::new(r"error:(.*),") else {
+        return None
     };
     re.captures(message).map(|capture| capture[1].to_string())
 }
 
 pub async fn get_temp_chan(ctx: &Context) -> Option<ChannelId> {
     let data = ctx.data.read().await;
-    let temp_chan = match data.get::<crate::TempChanContainer>() {
-        Some(chan) => chan,
-        None => {
-            error!("there was a problem getting the temp chan");
-            return None;
-        }
+    let Some(temp_chan) = data.get::<crate::TempChanContainer>() else {
+        error!("there was a problem getting the temp chan");
+        return None;
     };
     let temp_chan = temp_chan.lock().await;
     Some(*temp_chan)
@@ -122,9 +144,10 @@ pub async fn get_temp_chan(ctx: &Context) -> Option<ChannelId> {
 
 pub fn get_option<'a>(data: &'a CommandDataOption, name: &str) -> Option<&'a Value> {
     data.options
-         .iter()
-         .find(|o| o.name == name.to_string())?
-         .value.as_ref()
+        .iter()
+        .find(|o| o.name == *name)?
+        .value
+        .as_ref()
 }
 
 pub async fn interaction_response_message(
@@ -214,46 +237,4 @@ pub async fn interaction_response_modal(ctx: &Context, command: &ApplicationComm
             error!("Error sending error message ({why}) to channel because : {e}");
         }
     }
-}
-
-pub async fn runner_connection(ctx: Arc<Context>) -> Option<ConnectionStage> {
-    let data = ctx.data.read().await;
-    let shard_manager = match data.get::<ShardManagerContainer>() {
-        Some(v) => v,
-        None => {
-            error!("There was a problem getting the shard manager");
-            return None;
-        }
-    };
-    let manager = shard_manager.lock().await;
-    let runners = manager.runners.lock().await;
-    let runner = match runners.get(&ShardId(ctx.shard_id)) {
-        Some(runner) => runner,
-        None => {
-            error!("No shard found");
-            return None;
-        }
-    };
-    Some(runner.stage)
-}
-
-pub async fn runner_latency(ctx: Arc<Context>) -> Option<Duration> {
-    let data = ctx.data.read().await;
-    let shard_manager = match data.get::<ShardManagerContainer>() {
-        Some(v) => v,
-        None => {
-            error!("There was a problem getting the shard manager");
-            return None;
-        }
-    };
-    let manager = shard_manager.lock().await;
-    let runners = manager.runners.lock().await;
-    let runner = match runners.get(&ShardId(ctx.shard_id)) {
-        Some(runner) => runner,
-        None => {
-            error!("No shard found");
-            return None;
-        }
-    };
-    runner.latency
 }

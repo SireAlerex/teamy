@@ -47,17 +47,17 @@ fn choose<'a>(choices: &[&'a str]) -> &'a str {
 async fn find_emoji(ctx: &Context, guild_id: Option<GuildId>, name: &str) -> Option<Emoji> {
     // None if not in guild
     guild_id?;
-    let emojis = match guild_id.unwrap().emojis(&ctx.http).await {
-        Ok(e) => e,
-        Err(_) => return None,
+    let Ok(emojis) = guild_id.unwrap().emojis(&ctx.http).await else {
+        return None;
     };
     emojis.iter().find(|e| e.name == name).cloned()
 }
 
 async fn emoji_or(ctx: &Context, guild_id: Option<GuildId>, name: &str) -> String {
-    match find_emoji(ctx, guild_id, name).await {
-        Some(emoji) => format!("{emoji}"),
-        None => format!("<veuillez imaginer l'emoji \"{name}\">"),
+    if let Some(emoji) = find_emoji(ctx, guild_id, name).await {
+        emoji.to_string()
+    } else {
+        format!("<veuillez imaginer l'emoji \"{name}\">")
     }
 }
 
@@ -67,9 +67,8 @@ fn bot(message: &str) -> bool {
 
 fn ou(message: &str) -> Option<&str> {
     let mut options = message.split(" ou ");
-    let re = match regex::Regex::new(r"bot|robot|teamy") {
-        Ok(r) => r,
-        Err(_) => return None,
+    let Ok(re) = regex::Regex::new(r"bot|robot|teamy") else {
+        return None;
     };
     let a = re.split(options.next()?).last()?;
     let b = re.split(options.next()?).next()?;
@@ -106,17 +105,17 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> String {
     let user_message = msg.content.to_lowercase();
     let user = msg.author.clone();
 
-    let checks = mute_checks(ctx, msg).await;
-    if checks {
+    if mute_checks(ctx, msg).await {
         return String::new();
     }
 
-    let user_nick = match msg.is_private() {
-        true => user.name,
-        false => match user.nick_in(&ctx.http, msg.guild_id.unwrap()).await {
+    let user_nick = if msg.is_private() {
+        user.name
+    } else {
+        match user.nick_in(&ctx.http, msg.guild_id.unwrap()).await {
             Some(nick) => nick,
             None => user.name,
-        },
+        }
     };
 
     // emoji reactions

@@ -24,9 +24,7 @@ async fn edit(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
 
 async fn edit_macro(ctx: &Context, user_id: String, name: String, args: String) -> CommandResult {
     let query = doc! {"user_id": user_id, "name": name};
-    let original_macro = if let Some(m) = db::find_filter::<Macro>(ctx, "macros", query).await? {
-        m
-    } else {
+    let Some(original_macro) = db::find_filter::<Macro>(ctx, "macros", query).await? else {
         return Err(utils::command_error("Macro non trouvée"));
     };
     let modified_macro = original_macro.clone().edit(Some(&args));

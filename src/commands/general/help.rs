@@ -27,10 +27,11 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
     let mut fields: Vec<(&'static str, String, bool)> = Vec::default();
     let arg = command.data.options.first();
     if arg.is_some() {
-        let arg = utils::strip_prefix_suffix(arg.unwrap().value.as_ref().unwrap().to_string(), '"');
+        let arg =
+            utils::strip_prefix_suffix(arg.unwrap().value.as_ref().unwrap().as_str().unwrap(), '"');
 
         let x = CommandGroups {
-            groups: groups.to_vec(),
+            groups: groups.clone(),
         };
         if let Some(search_group) = x.find_group(&arg) {
             let command = search_group.find_command(&arg).unwrap();
@@ -54,7 +55,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
                         .collect::<Vec<String>>()
                         .join("\n"),
                     true,
-                ))
+                ));
             }
             // group field
             fields.push(("Group", search_group.name.to_owned(), true));
@@ -68,7 +69,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
                         .collect::<Vec<String>>()
                         .join(","),
                     true,
-                ))
+                ));
             }
         } else {
             title = arg.clone();
@@ -95,7 +96,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
                 .collect::<Vec<String>>()
                 .join(", ");
             let command_names = command_names.join("\n");
-            let value = format!("Préfixe(s) : {}\n{}", prefixes, command_names);
+            let value = format!("Préfixe(s) : {prefixes}\n{command_names}");
             fields.push((name, value, true));
         }
     }
@@ -105,7 +106,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         .description(description)
         .fields(fields)
         .color(serenity::utils::Colour::PURPLE)
-        .to_owned();
+        .clone();
 
     InteractionResponse::Message(InteractionMessage {
         content: String::default(),

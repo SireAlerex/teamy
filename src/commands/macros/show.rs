@@ -23,7 +23,9 @@ async fn show(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
 
 async fn macro_embed(ctx: &Context, user: &User) -> Result<CreateEmbed, CommandError> {
     let macros = get_macros(ctx, user.id).await?;
-    let pretty_macros = if !macros.is_empty() {
+    let pretty_macros = if macros.is_empty() {
+        String::from("Vous n'avez aucune macro")
+    } else {
         macros
             .iter()
             .map(|macr| {
@@ -36,14 +38,12 @@ async fn macro_embed(ctx: &Context, user: &User) -> Result<CreateEmbed, CommandE
             })
             .collect::<Vec<String>>()
             .join("\n")
-    } else {
-        String::from("Vous n'avez aucune macro")
     };
     let embed = CreateEmbed::default()
         .description(format!("Macros de {}", user.name))
         .field("Macros", pretty_macros, false)
         .color(serenity::utils::Colour::PURPLE)
-        .to_owned();
+        .clone();
     Ok(embed)
 }
 

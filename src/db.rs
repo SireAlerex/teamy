@@ -154,11 +154,10 @@ pub async fn insert<
     object: &T,
 ) -> Result<Bson, Error> {
     let coll: Collection<T> = get_coll(ctx, collection).await?;
-    if !is_object_in_coll(ctx, collection, object).await? {
-        let id = coll.insert_one(object, None).await?.inserted_id;
-        Ok(id)
-    } else {
+    if is_object_in_coll(ctx, collection, object).await? {
         Err(mongodb_error("l'objet à insérer existe déjà"))
+    } else {
+        Ok(coll.insert_one(object, None).await?.inserted_id)
     }
 }
 
@@ -192,8 +191,7 @@ pub async fn update<
         }
     } else {
         Err(mongodb_error(format!(
-            "erreur pour accéder à l'objet : {:?}",
-            object
+            "erreur pour accéder à l'objet : {object:?}"
         )))
     }
 }
@@ -240,8 +238,7 @@ pub async fn delete<
         }
     } else {
         Err(mongodb_error(format!(
-            "erreur pour accéder à l'objet : {:?}",
-            object
+            "erreur pour accéder à l'objet : {object:?}"
         )))
     }
 }

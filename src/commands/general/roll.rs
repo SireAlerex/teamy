@@ -32,9 +32,8 @@ impl FromStr for DropKeep {
         }
 
         let re = regex::Regex::new(r"(?P<dk>kh|kl|k|dh|dl|d)(?P<dk_val>\d+)")?;
-        let caps = match re.captures(s) {
-            Some(caps) => caps,
-            None => return Err(utils::command_error("erreur captures regex")),
+        let Some(caps) = re.captures(s) else {
+            return Err(utils::command_error("erreur captures regex"))
         };
 
         let dk = if let Some(m) = caps.name("dk") {
@@ -114,7 +113,7 @@ impl Roll {
                 DropKeep::KH(x) => drop_low(rolls, self.number - x),
                 DropKeep::DH(x) => drop_high(rolls, x),
                 DropKeep::KL(x) => drop_high(rolls, self.number - x),
-                _ => panic!("drop/keep is_some error"),
+                DropKeep::None => panic!("drop/keep is_some error"),
             };
             (
                 format!(
@@ -128,7 +127,7 @@ impl Roll {
         };
 
         let res = sum(&rolls, self.modifier).to_string();
-        let message = format!("{self} {}", show_res(s, res, self.number, self.modifier));
+        let message = format!("{self} {}", show_res(&s, res, self.number, self.modifier));
         RollResult {
             roll: self,
             rolls,
@@ -167,9 +166,8 @@ impl FromStr for Roll {
         let re = regex::Regex::new(
             r"(?P<number>\d+)?d(?P<size>\d+)(?P<modifier>\+\d+|-\d+)?(?P<dk>kh\d+|kl\d+|k\d+|dh\d+|dl\d+|d\d+)?",
         )?;
-        let caps = match re.captures(s) {
-            Some(caps) => caps,
-            None => return Err(utils::command_error("erreur captures regex")),
+        let Some(caps) = re.captures(s) else {
+            return Err(utils::command_error("erreur captures regex"))
         };
 
         let number = match caps.name("number") {
@@ -325,7 +323,7 @@ fn sum(rolls: &[u64], modifier: i64) -> i64 {
     modifier + <u64 as TryInto<i64>>::try_into(rolls.iter().sum::<u64>()).unwrap()
 }
 
-fn show_res(roll: String, res: String, number: u64, modifier: i64) -> String {
+fn show_res(roll: &str, res: String, number: u64, modifier: i64) -> String {
     if number == 1 && modifier == 0 {
         res
     } else {
@@ -415,16 +413,13 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
             _ => (),
         }
     }
-    let dk = if let Ok(d) = DropKeep::from_str(&init_dk) {
-        d
-    } else {
+    let Ok(dk) = DropKeep::from_str(&init_dk) else {
         return InteractionResponse::Message(InteractionMessage {
             content: "erreur dk".to_string(),
             ephemeral: true,
             embed: None,
         });
     };
-
     let r = RollBuilder::new()
         .number(n.try_into().unwrap())
         .size(size.try_into().unwrap())

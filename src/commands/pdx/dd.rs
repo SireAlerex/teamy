@@ -42,10 +42,12 @@ async fn check_links(pdx: &PdxLinks) -> Result<Vec<(PdxGame, Option<String>)>, C
     }
     if let Some((_, err)) = results.iter().find(|(_, res)| res.is_err()) {
         Err(utils::command_error(format!(
-            "link threaded error : {}", err.as_ref().unwrap_err()
+            "link threaded error : {}",
+            err.as_ref().unwrap_err()
         )))
     } else {
-        Ok(results.into_iter()
+        Ok(results
+            .into_iter()
             .map(|(game, res)| (game, res.unwrap_or(None)))
             .collect())
     }
@@ -62,7 +64,7 @@ async fn update_links(
         let mut new_pdx = pdx.clone();
         for (game, link) in new_links.iter().filter(|(_, o)| o.is_some()) {
             // only options are some so unwrap is safe
-            new_pdx.update(game, link.clone().unwrap())?;
+            new_pdx.update(*game, &link.clone().unwrap())?;
         }
         db::delete(ctx, "pdx_links", &pdx).await?;
         let _: bson::Bson = db::insert(ctx, "pdx_links", &new_pdx).await?;
@@ -88,7 +90,7 @@ async fn show(ctx: &Context, msg: &Message, links: &PdxLinks) -> CommandResult {
         .description("Liens des derniers DD")
         .fields(fields)
         .color(serenity::utils::Color::PURPLE)
-        .to_owned();
+        .clone();
 
     let _: Message = msg
         .channel_id
@@ -100,12 +102,11 @@ async fn show(ctx: &Context, msg: &Message, links: &PdxLinks) -> CommandResult {
 
 async fn get_follows(ctx: &Context, user_id: String) -> Result<PdxFollow, CommandError> {
     let filter = doc! { "user_id": user_id.clone() };
-    match db::find_filter::<PdxFollow>(ctx, "pdx_follows", filter).await? {
-        Some(pdx) => Ok(pdx),
-        None => {
-            let pdx = PdxFollow::new(user_id);
-            _ = db::insert(ctx, "pdx_follows", &pdx).await?;
-            Ok(pdx)
-        }
+    if let Some(pdx) = db::find_filter::<PdxFollow>(ctx, "pdx_follows", filter).await? {
+        Ok(pdx)
+    } else {
+        let pdx = PdxFollow::new(user_id);
+        _ = db::insert(ctx, "pdx_follows", &pdx).await?;
+        Ok(pdx)
     }
 }
