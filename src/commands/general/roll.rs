@@ -97,7 +97,7 @@ impl Roll {
         Roll::default()
     }
 
-    pub fn roll(&self) -> RollResult {
+    pub fn roll(&self) -> Result<RollResult, &str> {
         let mut rolls: Vec<u64> = Vec::new();
         let mut rng = rand::thread_rng();
 
@@ -113,7 +113,7 @@ impl Roll {
                 DropKeep::KH(x) => drop_low(rolls, self.number - x),
                 DropKeep::DH(x) => drop_high(rolls, x),
                 DropKeep::KL(x) => drop_high(rolls, self.number - x),
-                DropKeep::None => panic!("drop/keep is_some error"),
+                DropKeep::None => return Err("drop/keep is_some error"),
             };
             (
                 format!(
@@ -126,13 +126,15 @@ impl Roll {
             (initial_roll, rolls)
         };
 
-        let res = sum(&rolls, self.modifier).to_string();
-        let message = format!("{self} {}", show_res(&s, res, self.number, self.modifier));
-        RollResult {
+        let Ok(res) = sum(&rolls, self.modifier) else {
+            return Err("modifieur conversion error");
+        };
+        let message = format!("{self} {}", show_res(&s, res.to_string(), self.number, self.modifier));
+        Ok(RollResult {
             roll: self,
             rolls,
             message,
-        }
+        })
     }
 }
 
@@ -280,7 +282,7 @@ pub struct RollResult<'a> {
 
 impl RollResult<'_> {
     #[allow(dead_code)]
-    pub fn sum(&self) -> i64 {
+    pub fn sum(&self) -> Result<i64, std::num::TryFromIntError> {
         sum(&self.rolls, self.roll.modifier)
     }
 }
@@ -313,14 +315,16 @@ pub async fn roll_intern(
     args: Args,
 ) -> Result<Message, CommandError> {
     let msg = channel_id
-        .say(&ctx.http, Roll::from_str(args.message())?.roll())
+        .say(&ctx.http, Roll::from_str(args.message())?.roll()?)
         .await?;
 
     Ok(msg)
 }
 
-fn sum(rolls: &[u64], modifier: i64) -> i64 {
-    modifier + <u64 as TryInto<i64>>::try_into(rolls.iter().sum::<u64>()).unwrap()
+fn sum(rolls: &[u64], modifier: i64) -> Result<i64, std::num::TryFromIntError> {
+    Ok(modifier + <u64 as TryInto<i64>>::try_into(rolls.iter().sum::<u64>())?)
+    // let x: StdResult<i64, std::num::TryFromIntError> = <u64 as TryInto<i64>>::try_into(rolls.iter().sum::<u64>());
+    // modifier
 }
 
 fn show_res(roll: &str, res: String, number: u64, modifier: i64) -> String {
@@ -342,6 +346,7 @@ fn rolls_str(rolls: &[u64], modifier: i64) -> String {
     )
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn drop_low(mut rolls: Vec<u64>, n: u64) -> Vec<u64> {
     let bad_elements = rolls
         .clone()
@@ -351,13 +356,14 @@ fn drop_low(mut rolls: Vec<u64>, n: u64) -> Vec<u64> {
         .skip(rolls.len() - (n as usize))
         .collect::<Vec<u64>>();
     for elem in bad_elements {
-        // each element is necessary inside iterator so unwrap is safe
-        let index = rolls.clone().into_iter().position(|e| e == elem).unwrap();
-        rolls.remove(index);
+        if let Some(index) = rolls.clone().into_iter().position(|e| e == elem) {
+            rolls.remove(index);
+        }
     }
     rolls
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn drop_high(mut rolls: Vec<u64>, n: u64) -> Vec<u64> {
     let bad_elements = rolls
         .clone()
@@ -366,9 +372,9 @@ fn drop_high(mut rolls: Vec<u64>, n: u64) -> Vec<u64> {
         .skip(rolls.len() - (n as usize))
         .collect::<Vec<u64>>();
     for elem in bad_elements {
-        // each element is necessary inside iterator so unwrap is safe
-        let index = rolls.clone().into_iter().position(|e| e == elem).unwrap();
-        rolls.remove(index);
+        if let Some(index) = rolls.clone().into_iter().position(|e| e == elem) {
+            rolls.remove(index);
+        }
     }
     rolls
 }
@@ -381,6 +387,7 @@ fn add_modifier(s: String, modifier: i64) -> String {
     }
 }
 
+// TODO: refactor as wrapper with result<interaction, string> for error handling
 pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
     let mut n = 1;
     let mut size = 0;
@@ -388,50 +395,55 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
     let mut init_dk = String::new();
 
     for arg in options {
-        let value = arg.resolved.as_ref().unwrap();
-        match arg.name.as_str() {
-            "number" => {
-                if let CommandDataOptionValue::Integer(x) = value {
-                    n = *x;
+        if let Some(value) = arg.resolved.as_ref() {
+            match arg.name.as_str() {
+                "number" => {
+                    if let CommandDataOptionValue::Integer(x) = value {
+                        n = *x;
+                    }
                 }
-            }
-            "size" => {
-                if let CommandDataOptionValue::Integer(x) = value {
-                    size = *x;
+                "size" => {
+                    if let CommandDataOptionValue::Integer(x) = value {
+                        size = *x;
+                    }
                 }
-            }
-            "modifier" => {
-                if let CommandDataOptionValue::Integer(x) = value {
-                    modifier = *x;
+                "modifier" => {
+                    if let CommandDataOptionValue::Integer(x) = value {
+                        modifier = *x;
+                    }
                 }
-            }
-            "drop_keep" => {
-                if let CommandDataOptionValue::String(s) = value {
-                    init_dk = s.to_string();
+                "drop_keep" => {
+                    if let CommandDataOptionValue::String(s) = value {
+                        init_dk = s.to_string();
+                    }
                 }
+                _ => (),
             }
-            _ => (),
         }
+        
     }
+    let Ok(n): Result<u64, _> = n.try_into() else {
+        return InteractionResponse::Message(InteractionMessage::ephemeral("erreur dice number conversion"));
+    };
+    let Ok(size): Result<u64, _> = size.try_into() else {
+        return InteractionResponse::Message(InteractionMessage::ephemeral("erreur dice size conversion"));
+    };
+
     let Ok(dk) = DropKeep::from_str(&init_dk) else {
-        return InteractionResponse::Message(InteractionMessage {
-            content: "erreur dk".to_string(),
-            ephemeral: true,
-            embed: None,
-        });
+        return InteractionResponse::Message(InteractionMessage::ephemeral("erre dk"));
     };
     let r = RollBuilder::new()
-        .number(n.try_into().unwrap())
-        .size(size.try_into().unwrap())
+        .number(n)
+        .size(size)
         .modifier(modifier)
         .drop_keep(dk)
         .build();
 
-    InteractionResponse::Message(InteractionMessage {
-        content: r.roll().to_string(),
-        ephemeral: false,
-        embed: None,
-    })
+    let content = match r.roll() {
+        Ok(roll) => roll.to_string(),
+        Err(e) => e.to_string(),
+    };
+    InteractionResponse::Message(InteractionMessage::with_content(content))
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

@@ -56,10 +56,13 @@ pub async fn handle_macro(ctx: &Context, msg: &Message) -> String {
         match res {
             Some(macr) => match macr.command.as_str() {
                 "roll" => {
-                    let x = macr.args.unwrap();
-                    match roll::roll(ctx, msg, Args::new(&x, &[])).await {
-                        Ok(_) => String::new(),
-                        Err(e) => format!("Erreur lors de la macro : {e}"),
+                    if let Some(args) = macr.args {
+                        match roll::roll(ctx, msg, Args::new(&args, &[])).await {
+                            Ok(_) => String::new(),
+                            Err(e) => format!("Erreur lors de la macro : {e}"),
+                        }
+                    } else {
+                        "la commande roll attends des arguments".to_owned()
                     }
                 }
                 _ => "La commande n'est pas prise en charge".to_string(),

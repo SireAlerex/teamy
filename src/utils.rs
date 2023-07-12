@@ -8,12 +8,7 @@ use serenity::{
     json::Value,
     model::{
         prelude::{
-            component::InputTextStyle,
-            interaction::{
-                application_command::{ApplicationCommandInteraction, CommandDataOption},
-                modal::ModalSubmitInteraction,
-                InteractionResponseType,
-            },
+            interaction::application_command::{ApplicationCommandInteraction, CommandDataOption},
             ChannelId, Message,
         },
         user::User,
@@ -22,7 +17,7 @@ use serenity::{
 };
 use tracing::error;
 
-use crate::{InteractionMessage, ShardManagerContainer};
+use crate::ShardManagerContainer;
 
 pub struct RunnerInfo {
     pub latency: Option<Duration>,
@@ -81,8 +76,8 @@ pub fn strip_prefix_suffix(initial_string: &str, c: char) -> String {
         None => initial_string,
     };
     match string_prefix.strip_suffix(c) {
-        Some(s) => s.to_string(),
-        None => string_prefix.to_string(),
+        Some(s) => s.to_owned(),
+        None => string_prefix.to_owned(),
     }
 }
 
@@ -109,15 +104,21 @@ pub fn admin_command(command: &ApplicationCommandInteraction) -> bool {
 }
 
 pub async fn say_or_error<T: Into<String>>(ctx: &Context, channel_id: ChannelId, content: T) {
-    let content = content.into();
+    let content_string = content.into();
+    if content_string.is_empty() {
+        return;
+    };
+    if let Err(e) = channel_id.say(&ctx.http, content_string.clone()).await {
+        error!("error sending message ({content_string}) in chan {channel_id} : {e}");
+    }
+}
+
+pub async fn say_or_error2(ctx: &Context, channel_id: ChannelId, content: &str) {
     if content.is_empty() {
         return;
     };
-    if let Err(e) = channel_id.say(&ctx.http, content.clone()).await {
-        error!(
-            "error sending message ({content}) in chan {} : {e}",
-            channel_id
-        );
+    if let Err(e) = channel_id.say(&ctx.http, content).await {
+        error!("error sending message ({content}) in chan {channel_id} : {e}");
     }
 }
 
@@ -125,23 +126,17 @@ pub fn command_error<T: Into<String>>(message: T) -> CommandError {
     Box::<dyn std::error::Error + Send + Sync>::from(message.into())
 }
 
-pub fn mongodb_error_message(message: &str) -> Option<String> {
-    let Ok(re) = regex::Regex::new(r"error:(.*),") else {
-        return None
-    };
-    re.captures(message).map(|capture| capture[1].to_string())
-}
-
 pub async fn get_temp_chan(ctx: &Context) -> Option<ChannelId> {
     let data = ctx.data.read().await;
-    let Some(temp_chan) = data.get::<crate::TempChanContainer>() else {
+    let Some(temp_chan_mutex) = data.get::<crate::TempChanContainer>() else {
         error!("there was a problem getting the temp chan");
         return None;
     };
-    let temp_chan = temp_chan.lock().await;
-    Some(*temp_chan)
+    let temp_chan_id = temp_chan_mutex.lock().await;
+    Some(*temp_chan_id)
 }
 
+// TODO: remove pub after refactor
 pub fn get_option<'a>(data: &'a CommandDataOption, name: &str) -> Option<&'a Value> {
     data.options
         .iter()
@@ -150,91 +145,25 @@ pub fn get_option<'a>(data: &'a CommandDataOption, name: &str) -> Option<&'a Val
         .as_ref()
 }
 
-pub async fn interaction_response_message(
-    ctx: &Context,
-    command: &ApplicationCommandInteraction,
-    interaction_message: InteractionMessage,
-) {
-    let (text, ephemeral, embed) = (
-        interaction_message.content,
-        interaction_message.ephemeral,
-        interaction_message.embed,
-    );
-    if let Err(why) = command
-        .create_interaction_response(&ctx.http, |response| {
-            response
-                .kind(InteractionResponseType::ChannelMessageWithSource)
-                .interaction_response_data(|message| {
-                    if let Some(e) = embed {
-                        message.content(text).ephemeral(ephemeral).add_embed(e)
-                    } else {
-                        message.content(text).ephemeral(ephemeral)
-                    }
-                })
-        })
-        .await
-    {
-        let error_message = format!("Erreur lors de la réponse à l'interaction : {why}");
-        if let Err(e) = command.channel_id.say(&ctx.http, error_message).await {
-            error!("Error sending error message ({why}) to channel because : {e}");
-        }
-    }
+pub fn command_option<'a>(options: &'a [CommandDataOption], name: &str) -> Option<&'a Value> {
+    options.iter()
+        .find(|option| option.name == *name)?
+        .value
+        .as_ref()
 }
 
-pub async fn interaction_response_message_from_modal(
-    ctx: &Context,
-    modal: &ModalSubmitInteraction,
-    interaction_message: InteractionMessage,
-) {
-    let (text, ephemeral, embed) = (
-        interaction_message.content,
-        interaction_message.ephemeral,
-        interaction_message.embed,
-    );
-    if let Err(why) = modal
-        .create_interaction_response(&ctx.http, |response| {
-            response
-                .kind(InteractionResponseType::ChannelMessageWithSource)
-                .interaction_response_data(|message| {
-                    if let Some(e) = embed {
-                        message.content(text).ephemeral(ephemeral).add_embed(e)
-                    } else {
-                        message.content(text).ephemeral(ephemeral)
-                    }
-                })
-        })
-        .await
-    {
-        let error_message = format!("Erreur lors de la réponse à l'interaction : {why}");
-        if let Err(e) = modal.channel_id.say(&ctx.http, error_message).await {
-            error!("Error sending error message ({why}) to channel because : {e}");
-        }
-    }
+pub fn command_option_str<'a>(options: &'a [CommandDataOption], name: &str) -> Option<&'a str> {
+    command_option(options, name).and_then(serenity::json::Value::as_str)
 }
 
-pub async fn interaction_response_modal(ctx: &Context, command: &ApplicationCommandInteraction) {
-    if let Err(why) = command
-        .create_interaction_response(&ctx.http, |response| {
-            response
-                .kind(InteractionResponseType::Modal)
-                .interaction_response_data(|modal| {
-                    modal
-                        .title("Formulaire")
-                        .components(|input| {
-                            input.create_action_row(|f| {
-                                f.create_input_text(|t| {
-                                    t.label("label").custom_id(2).style(InputTextStyle::Short)
-                                })
-                            })
-                        })
-                        .custom_id(1)
-                })
-        })
-        .await
-    {
-        let error_message = format!("Erreur lors de la réponse à l'interaction : {why}");
-        if let Err(e) = command.channel_id.say(&ctx.http, error_message).await {
-            error!("Error sending error message ({why}) to channel because : {e}");
+pub fn option_as_str<'a>(data: &'a CommandDataOption, name: &str) -> Option<&'a str> {
+    if let Some(v) = get_option(data, name) {
+        if let Some(s) = v.as_str() {
+            Some(s)
+        } else {
+            None
         }
+    } else {
+        None
     }
 }

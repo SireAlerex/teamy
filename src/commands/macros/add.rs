@@ -10,6 +10,7 @@ use serenity::model::prelude::interaction::modal::ModalSubmitInteraction;
 use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::model::prelude::Message;
 use serenity::prelude::Context;
+use tracing::info;
 
 #[command]
 #[description = "crée une macro"]
@@ -44,29 +45,23 @@ async fn add_macro(
 }
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
+    info!("help applicationcommandinteraction:\n{command:#?}");
     let subcommand = &command.data.options[0];
-    let name = utils::get_option(subcommand, "nom")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .to_string();
-    let command_name = utils::get_option(subcommand, "commande")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .to_string();
-    let args =
-        utils::get_option(subcommand, "arguments").map(|value| value.as_str().unwrap().to_string());
+    let name = match utils::option_as_str(subcommand, "nom") {
+        Some(s) => s.to_owned(),
+        None => return InteractionResponse::Message(InteractionMessage::ephemeral("erreur d'arguments : pas de 'nom'"))
+    };
+    let command_name = match utils::option_as_str(subcommand, "commande") {
+        Some(s) => s.to_owned(),
+        None => return InteractionResponse::Message(InteractionMessage::ephemeral("erreur d'arguments : pas de 'nom'"))
+    };
+    let args = utils::option_as_str(subcommand, "arguments").map(std::borrow::ToOwned::to_owned);
     let content = match add_macro(ctx, command.user.id.to_string(), name, command_name, args).await
     {
         Ok(_) => "La macro a bien été ajoutée".to_string(),
         Err(e) => format!("Erreur lors de l'ajout de macro : {e}"),
     };
-    InteractionResponse::Message(InteractionMessage {
-        content,
-        ephemeral: true,
-        embed: None,
-    })
+    InteractionResponse::Message(InteractionMessage::ephemeral(content))
 }
 
 async fn add_temp_macro(
@@ -138,11 +133,7 @@ pub async fn run_message_form(
     } else {
         "pas de message".to_string()
     };
-    InteractionResponse::Message(InteractionMessage {
-        content,
-        ephemeral: true,
-        embed: None,
-    })
+    InteractionResponse::Message(InteractionMessage::ephemeral(content))
 }
 
 async fn temp_cleanup(ctx: &Context, user_id: String) -> Result<(), mongodb::error::Error> {
@@ -170,7 +161,10 @@ async fn complete_macro(
 
 pub async fn run_message(ctx: &Context, modal: &ModalSubmitInteraction) -> InteractionResponse {
     // take name from modal and completes macro
-    let component = &modal.data.components.first().unwrap().components.first();
+    let component = match &modal.data.components.first() {
+        Some(action_row) => action_row.components.first(),
+        None => return InteractionResponse::Message(InteractionMessage::ephemeral("erreur : action row component"))
+    };
     let content = if let Some(ActionRowComponent::InputText(input)) = component {
         if input.custom_id == consts::MACRO_ADD_FORM_NAME {
             match complete_macro(ctx, modal.user.id.to_string(), input.value.clone()).await {
@@ -183,11 +177,7 @@ pub async fn run_message(ctx: &Context, modal: &ModalSubmitInteraction) -> Inter
     } else {
         "erreur modal component".to_string()
     };
-    InteractionResponse::Message(InteractionMessage {
-        content,
-        ephemeral: true,
-        embed: None,
-    })
+    InteractionResponse::Message(InteractionMessage::ephemeral(content))
 }
 
 pub async fn modal(ctx: &Context, command: &ApplicationCommandInteraction) {

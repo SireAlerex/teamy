@@ -60,9 +60,5 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
             None,
         ),
     };
-    InteractionResponse::Message(InteractionMessage {
-        content,
-        ephemeral: true,
-        embed,
-    })
+    InteractionResponse::Message(InteractionMessage::new(content, true, embed))
 }

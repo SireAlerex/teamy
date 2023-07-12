@@ -13,11 +13,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         "show" => show::run(ctx, command).await,
         "edit" => edit::run(ctx, command).await,
         "clear" => clear::run(ctx, command).await,
-        _ => InteractionResponse::Message(InteractionMessage {
-            content: "macro_unknown_subcommand".to_string(),
-            ephemeral: true,
-            embed: None,
-        }),
+        _ => InteractionResponse::Message(InteractionMessage::ephemeral("macro_unknown_subcommand")),
     }
 }
 

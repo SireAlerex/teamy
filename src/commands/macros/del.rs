@@ -33,18 +33,13 @@ async fn del_macro(
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
     let subcommand = &command.data.options[0];
-    let name = utils::get_option(subcommand, "nom")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .to_string();
+    let name = match utils::option_as_str(subcommand, "nom") {
+        Some(s) => s.to_owned(),
+        None => return InteractionResponse::Message(InteractionMessage::ephemeral("erreur d'arguments : pas de 'nom'"))
+    };
     let content = match del_macro(ctx, command.user.id.to_string(), name).await {
         Ok(_) => "La macro a bien été supprimée".to_string(),
         Err(e) => format!("Erreur lors de la suppression de macro : {e}"),
     };
-    InteractionResponse::Message(InteractionMessage {
-        content,
-        ephemeral: true,
-        embed: None,
-    })
+    InteractionResponse::Message(InteractionMessage::ephemeral(content))
 }

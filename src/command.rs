@@ -1,6 +1,7 @@
 use serenity::prelude::*;
 use std::sync::Arc;
 
+// struct containing info about a command
 #[derive(Debug, Clone)]
 pub struct CommandInfo {
     pub names: &'static [&'static str],
@@ -9,6 +10,7 @@ pub struct CommandInfo {
     pub examples: &'static [&'static str],
 }
 
+// struct containing info about a group command
 #[derive(Clone)]
 pub struct CommandGroupInfo {
     pub name: &'static str,
@@ -35,6 +37,10 @@ impl CommandGroupInfo {
 }
 
 impl CommandGroups {
+    pub fn new(groups: Vec<CommandGroupInfo>) -> Self {
+        Self { groups }
+    }
+
     pub fn find_group(&self, command_name: &str) -> Option<&CommandGroupInfo> {
         self.groups
             .iter()

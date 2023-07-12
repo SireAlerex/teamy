@@ -3,12 +3,41 @@ use crate::consts;
 use crate::db;
 use rand::seq::SliceRandom;
 use serenity::{
-    model::{
-        channel::Message,
-        prelude::{Emoji, GuildId, ReactionType},
-    },
-    prelude::Context,
+    model::{channel::Message, prelude::*},
+    prelude::*,
 };
+
+#[derive(Debug)]
+pub enum HandleMessageError {
+    #[allow(dead_code)]
+    General(String),
+    Serenity(SerenityError),
+    ReactionConversion(ReactionConversionError),
+}
+
+impl std::fmt::Display for HandleMessageError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::General(s) => write!(f, "{s}"),
+            Self::Serenity(e) => write!(f, "{e}"),
+            Self::ReactionConversion(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for HandleMessageError {}
+
+impl From<SerenityError> for HandleMessageError {
+    fn from(value: SerenityError) -> Self {
+        Self::Serenity(value)
+    }
+}
+
+impl From<ReactionConversionError> for HandleMessageError {
+    fn from(value: ReactionConversionError) -> Self {
+        Self::ReactionConversion(value)
+    }
+}
 
 fn full_word(string: &str, targets: &[&str]) -> i32 {
     targets
@@ -16,7 +45,7 @@ fn full_word(string: &str, targets: &[&str]) -> i32 {
         .filter(|t| string.contains(&t.to_lowercase()))
         .count()
         .try_into()
-        .unwrap()
+        .unwrap_or(i32::MAX)
 }
 
 fn endwith(string: &str, targets: &[&str]) -> bool {
@@ -29,14 +58,14 @@ fn endwith(string: &str, targets: &[&str]) -> bool {
 }
 
 fn present(string: &str, targets: &[&str]) -> bool {
-    full_word(string, targets) > 0
+    full_word(string, targets) > 0_i32
 }
 
 fn _capitalize(s: &str) -> String {
     let mut c = s.chars();
     match c.next() {
         None => String::new(),
-        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+        Some(f) => format!("{}{}", f.to_uppercase().collect::<String>(), c.as_str()),
     }
 }
 
@@ -44,13 +73,15 @@ fn choose<'a>(choices: &[&'a str]) -> &'a str {
     choices.choose(&mut rand::thread_rng()).unwrap_or(&"")
 }
 
-async fn find_emoji(ctx: &Context, guild_id: Option<GuildId>, name: &str) -> Option<Emoji> {
-    // None if not in guild
-    guild_id?;
-    let Ok(emojis) = guild_id.unwrap().emojis(&ctx.http).await else {
-        return None;
-    };
-    emojis.iter().find(|e| e.name == name).cloned()
+async fn find_emoji(ctx: &Context, guild: Option<GuildId>, name: &str) -> Option<Emoji> {
+    if let Some(guild_id) = guild {
+        let Ok(emojis) = guild_id.emojis(&ctx.http).await else {
+            return None;
+        };
+        emojis.iter().find(|e| e.name == name).cloned()
+    } else {
+        None
+    }
 }
 
 async fn emoji_or(ctx: &Context, guild_id: Option<GuildId>, name: &str) -> String {
@@ -77,21 +108,23 @@ fn ou(message: &str) -> Option<&str> {
 
 // true if is mute and shouldn't react
 async fn mute_checks(ctx: &Context, msg: &Message) -> bool {
-    (msg.guild_id.is_some()
-        && db::is_object_in_coll(
+    (if let Some(guild_id) = msg.guild_id {
+        db::is_object_in_coll(
             ctx,
             "mute_guilds",
-            &db::Guild::builder(msg.guild_id.unwrap().to_string()),
-        )
-        .await
-        .unwrap_or(false))
-        || db::is_object_in_coll(
-            ctx,
-            "mute_chans",
-            &db::Chan::builder(msg.channel_id.to_string()),
+            &db::Guild::builder(guild_id.to_string()),
         )
         .await
         .unwrap_or(false)
+    } else {
+        false
+    }) || db::is_object_in_coll(
+        ctx,
+        "mute_chans",
+        &db::Chan::builder(msg.channel_id.to_string()),
+    )
+    .await
+    .unwrap_or(false)
         || db::is_object_in_coll(
             ctx,
             "mute_users",
@@ -101,51 +134,51 @@ async fn mute_checks(ctx: &Context, msg: &Message) -> bool {
         .unwrap_or(false)
 }
 
-pub async fn handle_reaction(ctx: &Context, msg: &Message) -> String {
+pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, HandleMessageError> {
     let user_message = msg.content.to_lowercase();
     let user = msg.author.clone();
 
     if mute_checks(ctx, msg).await {
-        return String::new();
+        return Ok(String::new());
     }
 
-    let user_nick = if msg.is_private() {
-        user.name
-    } else {
-        match user.nick_in(&ctx.http, msg.guild_id.unwrap()).await {
+    let user_nick = if let Some(guild_id) = msg.guild_id {
+        match user.nick_in(&ctx.http, guild_id).await {
             Some(nick) => nick,
             None => user.name,
         }
+    } else {
+        user.name
     };
 
     // emoji reactions
     // pirate
     if present(&user_message, &["belle bite"]) {
-        let pirate = ReactionType::try_from("🏴‍☠️").unwrap();
-        let crossed_swords = ReactionType::try_from("⚔️").unwrap();
-        let _ = msg.react(&ctx.http, pirate).await;
-        let _ = msg.react(&ctx.http, crossed_swords).await;
+        let pirate = ReactionType::try_from("🏴‍☠️")?;
+        let crossed_swords = ReactionType::try_from("⚔️")?;
+        let _: Reaction = msg.react(&ctx.http, pirate).await?;
+        let _: Reaction = msg.react(&ctx.http, crossed_swords).await?;
     }
 
     // bengala
     if present(&user_message, &["bengala"]) {
-        let _ = msg.react(&ctx.http, '🍆').await;
+        let _: Reaction = msg.react(&ctx.http, '🍆').await?;
     }
 
     // string reactions
     // bonjour bot
     if bot(&user_message) && present(&user_message, &consts::SALUTATIONS) {
-        return format!("{} {} !", choose(&consts::SALUTATIONS), user_nick);
+        return Ok(format!("{} {} !", choose(&consts::SALUTATIONS), user_nick));
     }
 
     // societer
     if present(&user_message, &consts::SOCIETER) {
-        return emoji_or(ctx, msg.guild_id, "saucisse").await;
+        return Ok(emoji_or(ctx, msg.guild_id, "saucisse").await);
     }
 
     // sus
     if present(&user_message, &consts::SUS) {
-        return emoji_or(ctx, msg.guild_id, "afungus").await;
+        return Ok(emoji_or(ctx, msg.guild_id, "afungus").await);
     }
 
     // civ bedge
@@ -153,52 +186,52 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> String {
         && present(&user_message, &["civ"])
         && present(&user_message, &["Thomas"])
     {
-        return emoji_or(ctx, msg.guild_id, "nerd").await;
+        return Ok(emoji_or(ctx, msg.guild_id, "nerd").await);
     }
 
     // cum
     if present(&user_message, &consts::CUM) {
-        return ":milk:".to_owned();
+        return Ok(":milk:".to_owned());
     }
 
     // source
     if present(&user_message, &consts::SOURCE) {
-        return "Ça m'est apparu dans un rêve".to_owned();
+        return Ok("Ça m'est apparu dans un rêve".to_owned());
     }
 
     // pas mal non
     if present(&user_message, &["pas mal non"]) {
-        return "C'est français :flag_fr:".to_owned();
+        return Ok("C'est français :flag_fr:".to_owned());
     }
 
     // quoi
     if endwith(&user_message, &consts::QUOI) {
-        return choose(&consts::QUOI_REPONSE).to_owned();
+        return Ok(choose(&consts::QUOI_REPONSE).to_owned());
     }
 
     // good bot
     if bot(&user_message) && present(&user_message, &consts::GOOD) {
-        return choose(&consts::GOOD_REACTION).to_owned();
+        return Ok(choose(&consts::GOOD_REACTION).to_owned());
     }
 
     // bad bot
     if bot(&user_message) && present(&user_message, &consts::BAD) {
         let reaction = choose(&consts::BAD_REACTION);
         match reaction {
-            ":nerd:" => return nerd::run(&user_message),
-            _ => return reaction.to_owned(),
+            ":nerd:" => return Ok(nerd::run(&user_message)),
+            _ => return Ok(reaction.to_owned()),
         }
     }
 
     // gay bot
     if bot(&user_message) && present(&user_message, &["gay"]) {
-        return choose(&consts::HOT).to_owned();
+        return Ok(choose(&consts::HOT).to_owned());
     }
 
     // ou
     if bot(&user_message) && present(&user_message, &["ou"]) {
-        return ou(&user_message).unwrap_or("").to_owned();
+        return Ok(ou(&user_message).unwrap_or("").to_owned());
     }
 
-    String::new()
+    Ok(String::new())
 }

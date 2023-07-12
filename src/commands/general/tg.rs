@@ -56,11 +56,11 @@ async fn mute_status(ctx: &Context, command: &ApplicationCommandInteraction) -> 
         &db::Chan::builder(command.channel_id.to_string()),
     )
     .await;
-    let guild_muted = if command.guild_id.is_some() {
+    let guild_muted = if let Some(guild_id) = command.guild_id {
         db::is_object_in_coll(
             ctx,
             "mute_guilds",
-            &db::Guild::builder(command.guild_id.unwrap().to_string()),
+            &db::Guild::builder(guild_id.to_string()),
         )
         .await
     } else {
@@ -75,7 +75,7 @@ async fn mute_status(ctx: &Context, command: &ApplicationCommandInteraction) -> 
 }
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
-    let res = match command.data.options[0].name.as_str() {
+    let content = match command.data.options[0].name.as_str() {
         "moi" => {
             match toggle_mute(
                 ctx,
@@ -118,22 +118,27 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         }
         "serv" => {
             if command.guild_id.is_some() && utils::admin_command(command) {
-                match toggle_mute(
-                    ctx,
-                    "mute_guilds",
-                    db::Guild::builder(command.guild_id.unwrap().to_string()),
-                )
-                .await
-                {
-                    Ok(b) => {
-                        if b {
-                            String::from("Le bot répondra aux messages de ce serveur")
-                        } else {
-                            String::from("Le bot ne répondra plus aux messages de ce serveur")
+                if let Some(guild_id) = command.guild_id {
+                    match toggle_mute(
+                        ctx,
+                        "mute_guilds",
+                        db::Guild::builder(guild_id.to_string()),
+                    )
+                    .await
+                    {
+                        Ok(b) => {
+                            if b {
+                                String::from("Le bot répondra aux messages de ce serveur")
+                            } else {
+                                String::from("Le bot ne répondra plus aux messages de ce serveur")
+                            }
                         }
+                        Err(e) => format!("Erreur : {e}"),
                     }
-                    Err(e) => format!("Erreur : {e}"),
+                } else {
+                    "pas de guild_id".to_owned()
                 }
+                
             } else {
                 String::from("Vous devez être admin pour utiliser cette commande")
             }
@@ -141,11 +146,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         "status" => mute_status(ctx, command).await,
         _ => String::from("unexpected subcommand"),
     };
-    InteractionResponse::Message(InteractionMessage {
-        content: res,
-        ephemeral: true,
-        embed: None,
-    })
+    InteractionResponse::Message(InteractionMessage::ephemeral(content))
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

@@ -40,11 +40,7 @@ pub async fn run_message(
         }
         None => String::from("Erreur pour accéder au MessageId de l'interaction"),
     };
-    InteractionResponse::Message(InteractionMessage {
-        content: result,
-        ephemeral: false,
-        embed: None,
-    })
+    InteractionResponse::Message(InteractionMessage::with_content(result))
 }
 
 pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
@@ -53,11 +49,7 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
         options[0].value.as_ref().unwrap().as_str().unwrap(),
         based()
     );
-    InteractionResponse::Message(InteractionMessage {
-        content: result,
-        ephemeral: false,
-        embed: None,
-    })
+    InteractionResponse::Message(InteractionMessage::with_content(result))
 }
 
 pub fn register_message(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

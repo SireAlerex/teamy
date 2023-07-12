@@ -30,7 +30,7 @@ impl PdxGame {
 
 impl std::fmt::Display for PdxGame {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        let s = match self {
+        let s = match *self {
             PdxGame::Eu4 => "Europa Universalis IV",
             PdxGame::Victoria3 => "Victoria 3",
             PdxGame::Hoi4 => "Hearts of Iron IV",
@@ -116,7 +116,7 @@ impl PdxLinks {
 
     pub fn update(&mut self, game: PdxGame, new_link: &str) -> Result<(), String> {
         if let Some(gl) = self.games.iter_mut().find(|gl| gl.game == game) {
-            gl.update(new_link.to_string());
+            gl.update(new_link.to_owned());
             Ok(())
         } else {
             Err(format!("Le jeu {game:?} ne fait pas partie du PdxLinks"))
@@ -127,12 +127,12 @@ impl PdxLinks {
     #[allow(dead_code)]
     pub fn init() -> Self {
         let games = vec![
-            GameLinks {game: PdxGame::Eu4, latest: "https://forum.paradoxplaza.com/forum/developer-diary/europa-universalis-iv-development-diary-23rd-of-may-2023-1-35-3-known-issues-and-the-road-to-1-35-4.1586331/".to_string(), previous: "https://forum.paradoxplaza.com/forum/developer-diary/europa-universalis-iv-development-diary-25th-of-april-2023-1-35-post-release-support.1579720/".to_string()},
-            GameLinks {game: PdxGame::Victoria3, latest: "https://forum.paradoxplaza.com/forum/developer-diary/victoria-3-dev-diary-89-whats-next-after-1-3.1589178/".to_string(), previous: "https://forum.paradoxplaza.com/forum/developer-diary/victoria-3-dev-diary-88-voice-of-the-people-narrative-content-improvements.1588003/".to_string()},
-            GameLinks {game: PdxGame::Hoi4, latest: "https://forum.paradoxplaza.com/forum/developer-diary/developer-diary-historical-norway.1590854/".to_string(), previous: "https://forum.paradoxplaza.com/forum/developer-diary/developer-diary-historical-sweden.1589418/".to_string()},
-            GameLinks {game: PdxGame::Ck3, latest: "https://forum.paradoxplaza.com/forum/developer-diary/dev-diary-130-wards-and-wardens-the-vision.1590033/".to_string(), previous: "https://forum.paradoxplaza.com/forum/developer-diary/dev-diary-129-post-release-update-extra-content.1586430/".to_string()},
-            GameLinks {game: PdxGame::Stellaris, latest: "https://forum.paradoxplaza.com/forum/developer-diary/stellaris-dev-diary-304-3-8-4-released-whats-next.1589870/".to_string(), previous: "https://forum.paradoxplaza.com/forum/developer-diary/stellaris-dev-diary-303-stellaris-with-a-twist-community-event.1587986/".to_string()},
-            GameLinks {game: PdxGame::Aow4, latest: "https://forum.paradoxplaza.com/forum/developer-diary/dev-diary-18-dragon-lords.1589296/".to_string(), previous: "https://forum.paradoxplaza.com/forum/developer-diary/dev-diary-17-post-launch.1587996/".to_string()}
+            GameLinks {game: PdxGame::Eu4, latest: "https://forum.paradoxplaza.com/forum/developer-diary/europa-universalis-iv-development-diary-23rd-of-may-2023-1-35-3-known-issues-and-the-road-to-1-35-4.1586331/".to_owned(), previous: "https://forum.paradoxplaza.com/forum/developer-diary/europa-universalis-iv-development-diary-25th-of-april-2023-1-35-post-release-support.1579720/".to_owned()},
+            GameLinks {game: PdxGame::Victoria3, latest: "https://forum.paradoxplaza.com/forum/developer-diary/victoria-3-dev-diary-89-whats-next-after-1-3.1589178/".to_owned(), previous: "https://forum.paradoxplaza.com/forum/developer-diary/victoria-3-dev-diary-88-voice-of-the-people-narrative-content-improvements.1588003/".to_owned()},
+            GameLinks {game: PdxGame::Hoi4, latest: "https://forum.paradoxplaza.com/forum/developer-diary/developer-diary-historical-norway.1590854/".to_owned(), previous: "https://forum.paradoxplaza.com/forum/developer-diary/developer-diary-historical-sweden.1589418/".to_owned()},
+            GameLinks {game: PdxGame::Ck3, latest: "https://forum.paradoxplaza.com/forum/developer-diary/dev-diary-130-wards-and-wardens-the-vision.1590033/".to_owned(), previous: "https://forum.paradoxplaza.com/forum/developer-diary/dev-diary-129-post-release-update-extra-content.1586430/".to_owned()},
+            GameLinks {game: PdxGame::Stellaris, latest: "https://forum.paradoxplaza.com/forum/developer-diary/stellaris-dev-diary-304-3-8-4-released-whats-next.1589870/".to_owned(), previous: "https://forum.paradoxplaza.com/forum/developer-diary/stellaris-dev-diary-303-stellaris-with-a-twist-community-event.1587986/".to_owned()},
+            GameLinks {game: PdxGame::Aow4, latest: "https://forum.paradoxplaza.com/forum/developer-diary/dev-diary-18-dragon-lords.1589296/".to_owned(), previous: "https://forum.paradoxplaza.com/forum/developer-diary/dev-diary-17-post-launch.1587996/".to_owned()}
         ];
         Self {
             _id: ObjectId::new(),

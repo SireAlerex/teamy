@@ -56,8 +56,8 @@ pub async fn pdx_scraper(
     let div_selector = Selector::parse("a.pagenav-jump--next")?;
     let mut stream = response.bytes_stream();
 
-    while let Some(chunk) = stream.next().await {
-        let chunk = &chunk?.to_ascii_lowercase();
+    while let Some(chunk_res) = stream.next().await {
+        let chunk = &chunk_res?.to_ascii_lowercase();
         if chunk
             .windows(NEXT_DD.len())
             .all(|w| w != NEXT_DD.as_bytes())
@@ -75,7 +75,7 @@ pub async fn pdx_scraper(
                 "https://forum.paradoxplaza.com{}",
                 elem.value()
                     .attr("href")
-                    .ok_or_else(|| ScraperError::new("href error".to_string()))?
+                    .ok_or_else(|| ScraperError::new("href error".to_owned()))?
             )));
         }
     }

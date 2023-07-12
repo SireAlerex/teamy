@@ -3,6 +3,7 @@ use bson::Document;
 use mongodb::bson::doc;
 use mongodb::bson::to_document;
 use mongodb::options::UpdateModifications;
+use mongodb::results::DeleteResult;
 use mongodb::results::UpdateResult;
 use mongodb::{
     error::Error,
@@ -68,10 +69,16 @@ pub fn mongodb_error<T: Into<String>>(message: T) -> Error {
 
 async fn get_client(ctx: &Context) -> Result<Client, Error> {
     let data = ctx.data.read().await;
-    let db = data.get::<DatabaseUriContainer>().unwrap().lock().await;
-    let options =
-        ClientOptions::parse_with_resolver_config(&db.db_uri, ResolverConfig::cloudflare()).await?;
-    Client::with_options(options)
+    if let Some(db) = data.get::<DatabaseUriContainer>() {
+        let options = ClientOptions::parse_with_resolver_config(
+            &db.lock().await.db_uri,
+            ResolverConfig::cloudflare(),
+        )
+        .await?;
+        Client::with_options(options)
+    } else {
+        Err(mongodb_error("no db uri"))
+    }
 }
 
 pub async fn get_coll<'a, T: core::fmt::Debug + serde::Deserialize<'a> + serde::Serialize>(
@@ -178,9 +185,9 @@ pub async fn update<
     if let Ok(o) = get_object(ctx, collection, object).await {
         match o {
             Some(res) => {
-                let _ = coll
+                let _: UpdateResult = coll
                     .update_one(
-                        doc! {"_id": to_document(&res).unwrap().get("_id")},
+                        doc! {"_id": to_document(&res)?.get("_id")},
                         (*update).clone(),
                         None,
                     )
@@ -229,8 +236,8 @@ pub async fn delete<
     if let Ok(o) = get_object(ctx, collection, object).await {
         match o {
             Some(res) => {
-                let _ = coll
-                    .delete_one(doc! {"_id": to_document(&res).unwrap().get("_id")}, None)
+                let _: DeleteResult = coll
+                    .delete_one(doc! {"_id": to_document(&res)?.get("_id")}, None)
                     .await?;
                 Ok(())
             }

@@ -1,6 +1,8 @@
 pub mod command;
 mod commands;
+pub mod interaction;
 pub mod consts;
+#[allow(clippy::impl_trait_in_params)]
 pub mod db;
 mod loops;
 mod message;
@@ -9,7 +11,6 @@ pub mod web_scraper;
 
 use anyhow::anyhow;
 use serenity::async_trait;
-use serenity::builder::CreateEmbed;
 use serenity::client::bridge::gateway::ShardManager;
 use serenity::framework::standard::macros::{group, help, hook};
 use serenity::framework::standard::{
@@ -31,6 +32,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info};
 
+use interaction::{InteractionMessage, InteractionResponse};
 use crate::command::{CommandGroupInfo, CommandGroups, CommandGroupsContainer, CommandInfo};
 use crate::commands::general;
 use crate::commands::general::{
@@ -82,18 +84,6 @@ impl TypeMapKey for TempChanContainer {
     type Value = Arc<tokio::sync::Mutex<ChannelId>>;
 }
 
-pub enum InteractionResponse {
-    Message(InteractionMessage),
-    Modal,
-    None,
-}
-
-pub struct InteractionMessage {
-    content: String,
-    ephemeral: bool,
-    embed: Option<CreateEmbed>,
-}
-
 struct Bot {
     is_loop_running: AtomicBool,
 }
@@ -107,7 +97,10 @@ impl EventHandler for Bot {
         let content = match utils::first_letter(&msg.content) {
             Some('$') | None => String::new(), // do nothing if command or empty message
             Some('!') => commands::macros::r#macro::handle_macro(&ctx, &msg).await,
-            _ => message::handle_reaction(&ctx, &msg).await,
+            _ => match message::handle_reaction(&ctx, &msg).await {
+                Ok(s) => s,
+                Err(e) => e.to_string(),
+            },
         };
         utils::say_or_error(&ctx, msg.channel_id, &content).await;
     }
@@ -115,9 +108,9 @@ impl EventHandler for Bot {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!("{} is connected!", ready.user.name);
 
-        let ctx: Arc<Context> = Arc::new(ctx);
+        let ctx_arc: Arc<Context> = Arc::new(ctx);
         if !self.is_loop_running.load(Ordering::Relaxed) {
-            let ctx1 = Arc::clone(&ctx);
+            let ctx1 = Arc::clone(&ctx_arc);
 
             tokio::spawn(async move {
                 loop {
@@ -126,7 +119,7 @@ impl EventHandler for Bot {
                 }
             });
 
-            let ctx2 = Arc::clone(&ctx);
+            let ctx2 = Arc::clone(&ctx_arc);
 
             tokio::spawn(async move {
                 loop {
@@ -137,14 +130,20 @@ impl EventHandler for Bot {
         }
 
         // clean global commands
-        for command in Command::get_global_application_commands(&ctx.http)
-            .await
-            .unwrap()
-        {
-            let _ = Command::delete_global_application_command(&ctx.http, command.id).await;
+        match Command::get_global_application_commands(&ctx_arc.http).await {
+            Ok(commands) => {
+                for command in commands {
+                    if let Err(e) =
+                        Command::delete_global_application_command(&ctx_arc.http, command.id).await
+                    {
+                        error!("error while deleting global applications command : {e}");
+                    }
+                }
+            }
+            Err(e) => error!("error while getting global application commands : {e}"),
         }
 
-        let data = ctx.data.read().await;
+        let data = ctx_arc.data.read().await;
         let guild_group = if let Some(guild_group) = data.get::<GuildIdContainer>() {
             guild_group
         } else {
@@ -159,7 +158,7 @@ impl EventHandler for Bot {
             results.push((
                 *guild,
                 guild
-                    .set_application_commands(&ctx.http, |commands| {
+                    .set_application_commands(&ctx_arc.http, |commands| {
                         commands
                             .create_application_command(|c| general::help::register(c))
                             .create_application_command(|c| general::bonjour::register(c))
@@ -203,61 +202,42 @@ impl EventHandler for Bot {
                         "basé" => general::based::run_chat_input(&command.data.options),
                         "tg" => general::tg::run(&ctx, &command).await,
                         "macro" => macros::setup::run(&ctx, &command).await,
-                        _ => InteractionResponse::Message(InteractionMessage {
-                            content: format!("Unkown command ChatInput : {}", command.data.name),
-                            ephemeral: true,
-                            embed: None,
-                        }),
+                        _ => InteractionResponse::Message(InteractionMessage::ephemeral(format!("Unkown command ChatInput : {}", command.data.name))),
                     },
                     CommandType::Message => match command.data.name.as_str() {
                         "nerd" => general::nerd::run_message(&ctx, &command).await,
                         "basé" => general::based::run_message(&ctx, &command).await,
                         "macro add" => macros::add::run_message_form(&ctx, &command).await,
-                        _ => InteractionResponse::Message(InteractionMessage {
-                            content: format!("Unkown command Message : {}", command.data.name),
-                            ephemeral: true,
-                            embed: None,
-                        }),
+                        _ => InteractionResponse::Message(InteractionMessage::ephemeral(format!("Unkown command Message : {}", command.data.name))),
                     },
                     CommandType::User => match command.data.name.as_str() {
                         "id" => general::id::run_user(&ctx, &command).await,
-                        _ => InteractionResponse::Message(InteractionMessage {
-                            content: format!("Unkown command User : {}", command.data.name),
-                            ephemeral: true,
-                            embed: None,
-                        }),
+                        _ => InteractionResponse::Message(InteractionMessage::ephemeral(format!("Unkown command User : {}", command.data.name))),
                     },
-                    _ => InteractionResponse::Message(InteractionMessage {
-                        content: "Unkown data kind".to_owned(),
-                        ephemeral: true,
-                        embed: None,
-                    }),
+                    CommandType::Unknown => InteractionResponse::Message(InteractionMessage::ephemeral("Unkown data kind")),
+                    _ => InteractionResponse::Message(InteractionMessage::ephemeral("wildcard data kind")),
                 };
 
                 match result {
-                    InteractionResponse::Message(interaction) => {
-                        utils::interaction_response_message(&ctx, &command, interaction).await;
+                    InteractionResponse::Message(interaction_message) => {
+                        interaction_message.send_from_command(&ctx, &command).await;
                     }
-                    InteractionResponse::Modal => {
-                        utils::interaction_response_modal(&ctx, &command).await;
-                    }
+                    InteractionResponse::Modal => todo!(),
                     InteractionResponse::None => (),
                 }
             }
             Interaction::ModalSubmit(modal) => {
                 let res = match modal.data.custom_id.as_str() {
                     consts::MACRO_ADD_FORM_ID => macros::add::run_message(&ctx, &modal).await,
-                    _ => InteractionResponse::Message(InteractionMessage {
-                        content: "modal inconnu".to_owned(),
-                        ephemeral: true,
-                        embed: None,
-                    }),
+                    _ => InteractionResponse::Message(InteractionMessage::ephemeral("modal inconnu")),
                 };
                 if let InteractionResponse::Message(m) = res {
-                    utils::interaction_response_message_from_modal(&ctx, &modal, m).await;
+                    m.send_from_modal(&ctx, &modal).await;
                 }
             }
-            _ => (),
+            Interaction::Ping(_)
+            | Interaction::Autocomplete(_)
+            | Interaction::MessageComponent(_) => (),
         }
     }
 }
@@ -289,7 +269,8 @@ async fn my_help(
     groups: &[&'static CommandGroup],
     owners: HashSet<UserId>,
 ) -> CommandResult {
-    let _ = help_commands::with_embeds(ctx, msg, args, help_options, groups, owners).await;
+    let _: Message =
+        help_commands::with_embeds(ctx, msg, args, help_options, groups, owners).await?;
     Ok(())
 }
 
@@ -312,6 +293,7 @@ async fn after(ctx: &Context, msg: &Message, command_name: &str, command_result:
     }
 }
 
+#[allow(clippy::expect_used, clippy::panic)]
 #[shuttle_runtime::main]
 async fn serenity(
     #[shuttle_secrets::Secrets] secret_store: SecretStore,
@@ -341,25 +323,29 @@ async fn serenity(
         .group(&PDX_GROUP);
 
     let static_groups = vec![&GENERAL_GROUP, &MACRO_GROUP, &PDX_GROUP];
-    let mut groups: Vec<CommandGroupInfo> = Vec::default();
-    for group in static_groups {
-        let mut commands: Vec<CommandInfo> = Vec::default();
-        for command in group.options.commands {
-            let x = CommandInfo {
-                names: command.options.names,
-                desc: command.options.desc,
-                usage: command.options.usage,
-                examples: command.options.examples,
-            };
-            commands.push(x);
-        }
-        groups.push(CommandGroupInfo {
-            name: group.name,
-            commands,
-            prefixes: group.options.prefixes,
-        });
-    }
-    let groups: CommandGroups = CommandGroups { groups };
+    let groups: CommandGroups = CommandGroups {
+        groups: {
+            let mut groups: Vec<CommandGroupInfo> = Vec::default();
+            for group in &static_groups {
+                let mut commands: Vec<CommandInfo> = Vec::default();
+                for command in group.options.commands {
+                    let x = CommandInfo {
+                        names: command.options.names,
+                        desc: command.options.desc,
+                        usage: command.options.usage,
+                        examples: command.options.examples,
+                    };
+                    commands.push(x);
+                }
+                groups.push(CommandGroupInfo {
+                    name: group.name,
+                    commands,
+                    prefixes: group.options.prefixes,
+                });
+            }
+            groups
+        },
+    };
 
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::GUILD_MESSAGES

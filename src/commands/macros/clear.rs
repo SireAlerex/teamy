@@ -32,9 +32,5 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         Ok(_) => "Toutes vos macros ont bien été supprimées".to_string(),
         Err(e) => format!("Erreur lors de la suppression des macros : {e}"),
     };
-    InteractionResponse::Message(InteractionMessage {
-        content,
-        ephemeral: true,
-        embed: None,
-    })
+    InteractionResponse::Message(InteractionMessage::ephemeral(content))
 }

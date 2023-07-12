@@ -26,20 +26,19 @@ pub fn run(text: &str) -> String {
 }
 
 pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
-    let option = options
-        .get(0)
-        .unwrap()
-        .value
-        .as_ref()
-        .unwrap()
-        .as_str()
-        .unwrap();
+    // let s = if let Some(data) = options.get(0) {
+    //     utils::option_as_str(data, "texte")
+    // } else {
+    //     None
+    // };
+    // let content = if let Some(text) = s {
+    //     run(text)
+    // } else {
+    //     "erreur : pas d'argument 'texte'".to_owned()
+    // };
+    let result = utils::command_option_str(options, "texte").map_or("erreur: pas de texte?".to_owned(), run);
 
-    InteractionResponse::Message(InteractionMessage {
-        content: run(option),
-        ephemeral: false,
-        embed: None,
-    })
+    InteractionResponse::Message(InteractionMessage::with_content(result))
 }
 
 pub async fn run_message(
@@ -56,11 +55,7 @@ pub async fn run_message(
         }
         None => String::from("Erreur pour accéder au MessageId de l'interaction"),
     };
-    InteractionResponse::Message(InteractionMessage {
-        content: result,
-        ephemeral: false,
-        embed: None,
-    })
+    InteractionResponse::Message(InteractionMessage::with_content(result))
 }
 
 pub fn register_message(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

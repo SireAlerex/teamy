@@ -17,16 +17,8 @@ async fn slide(ctx: &Context, msg: &Message) -> CommandResult {
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
     match command.user.dm(&ctx.http, |m| m.content("Salut !")).await {
-        Ok(_) => InteractionResponse::Message(InteractionMessage {
-            content: "Un DM va être envoyé".to_owned(),
-            ephemeral: true,
-            embed: None,
-        }),
-        Err(e) => InteractionResponse::Message(InteractionMessage {
-            content: format!("Une erreur c'est produite : {e}"),
-            ephemeral: true,
-            embed: None,
-        }),
+        Ok(_) => InteractionResponse::Message(InteractionMessage::ephemeral("Un DM va être envoyé")),
+        Err(e) => InteractionResponse::Message(InteractionMessage::ephemeral(format!("Une erreur c'est produite : {e}"))),
     }
 }
 

@@ -10,8 +10,21 @@ use crate::{consts, LogChanIdContainer};
 
 pub async fn log_system_load(ctx: Arc<Context>) {
     let time = Local::now().to_rfc2822();
-    let cpu_load = sys_info::loadavg().unwrap();
-    let mem_use = sys_info::mem_info().unwrap();
+    let cpu_load = match sys_info::loadavg() {
+        Ok(load_avg) => format!("{:.2}%", load_avg.one * 10.0_f64),
+        Err(e) => format!("error while getting load average : {e}"),
+    };
+    let mem_use = match sys_info::mem_info() {
+        Ok(mem_info) => format!(
+            "{:.1}% ({:.2} MB Free out of {:.2} MB)",
+            (((mem_info.total as f64 / 1024.0_f64) - (mem_info.free as f64 / 1024.0_f64))
+                / (mem_info.total as f64 / 1024.0_f64))
+                * 100.0_f64,
+            mem_info.free as f64 / 1024.0_f64,
+            mem_info.total as f64 / 1024.0_f64
+        ),
+        Err(e) => format!("error while getting memory info : {e}"),
+    };
     let latency = if let Ok(runner) = utils::RunnerInfo::info(Arc::clone(&ctx)).await {
         runner.latency
     } else {
@@ -34,23 +47,8 @@ pub async fn log_system_load(ctx: Arc<Context>) {
             m.embed(|e| {
                 e.title("System Resource Load")
                     .field("Time", time, false)
-                    .field(
-                        "CPU Load Average",
-                        format!("{:.2}%", cpu_load.one * 10.0),
-                        false,
-                    )
-                    .field(
-                        "Memory Usage",
-                        format!(
-                            "{:.1}% ({:.2} MB Free out of {:.2} MB)",
-                            (((mem_use.total as f64 / 1024.0) - (mem_use.free as f64 / 1024.0))
-                                / (mem_use.total as f64 / 1024.0))
-                                * 100.0,
-                            mem_use.free as f64 / 1024.0,
-                            mem_use.total as f64 / 1024.0
-                        ),
-                        false,
-                    )
+                    .field("CPU Load Average", cpu_load, false)
+                    .field("Memory Usage", mem_use, false)
                     .field("Latency", format!("{latency:?}"), false)
             })
         })
@@ -61,6 +59,9 @@ pub async fn log_system_load(ctx: Arc<Context>) {
 }
 
 pub fn status_loop(ctx: &Arc<Context>) {
-    let game = *consts::GAME_POOL.iter().choose(&mut thread_rng()).unwrap();
+    let game = *consts::GAME_POOL
+        .iter()
+        .choose(&mut thread_rng())
+        .unwrap_or(&"no game :(");
     ctx.shard.set_activity(Some(Activity::playing(game)));
 }

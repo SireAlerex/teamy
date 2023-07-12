@@ -1,4 +1,4 @@
-use super::pdx::{PdxFollow, PdxGame, PdxLinks};
+use super::model::{PdxFollow, PdxGame, PdxLinks};
 use crate::{db, utils, web_scraper};
 use bson::doc;
 use serenity::builder::CreateEmbed;
@@ -38,21 +38,29 @@ async fn check_links(pdx: &PdxLinks) -> Result<Vec<(PdxGame, Option<String>)>, C
     }
 
     for handle in handles {
-        results.push(handle.await.unwrap());
+        results.push(handle.await?);
     }
-    if let Some((_, err)) = results.iter().find(|(_, res)| res.is_err()) {
-        Err(utils::command_error(format!(
-            "link threaded error : {}",
-            err.as_ref().unwrap_err()
-        )))
-    } else {
-        Ok(results
-            .into_iter()
-            .map(|(game, res)| (game, res.unwrap_or(None)))
-            .collect())
+    for (_, res) in &results {
+        if let Err(e) = res {
+            return Err(utils::command_error(format!(
+                "link threaded error : {e}")));
+        }
     }
+    Ok(results
+        .into_iter()
+        .map(|(game, res)| (game, res.unwrap_or(None)))
+        .collect())
+    // if let Some((_, err)) = results.iter().find(|(_, res)| res.is_err()) {
+    //     Err(utils::command_error(format!(
+    //         "link threaded error : {}",
+    //         err.as_ref().unwrap_err()
+    //     )))
+    // } else {
+        
+    // }
 }
 
+#[allow(clippy::unwrap_used)]
 async fn update_links(
     ctx: &Context,
     pdx: PdxLinks,
@@ -62,9 +70,12 @@ async fn update_links(
         Ok(pdx)
     } else {
         let mut new_pdx = pdx.clone();
-        for (game, link) in new_links.iter().filter(|(_, o)| o.is_some()) {
-            // only options are some so unwrap is safe
-            new_pdx.update(*game, &link.clone().unwrap())?;
+        for (game, link) in new_links
+            .iter()
+            .filter(|(_, o)| o.is_some())
+            .map(|(g, o)| (g, o.as_ref().unwrap()))
+        {
+            new_pdx.update(*game, link)?;
         }
         db::delete(ctx, "pdx_links", &pdx).await?;
         let _: bson::Bson = db::insert(ctx, "pdx_links", &new_pdx).await?;

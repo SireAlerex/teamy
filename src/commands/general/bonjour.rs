@@ -28,11 +28,7 @@ fn salutation() -> String {
 }
 
 pub fn run() -> InteractionResponse {
-    InteractionResponse::Message(InteractionMessage {
-        content: salutation(),
-        ephemeral: false,
-        embed: None,
-    })
+    InteractionResponse::Message(InteractionMessage::with_content(salutation()))
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

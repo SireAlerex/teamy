@@ -36,31 +36,30 @@ pub async fn run_user(
     ctx: &Context,
     command: &ApplicationCommandInteraction,
 ) -> InteractionResponse {
-    let result = match command.data.target_id {
+    let content = match command.data.target_id {
         Some(target_id) => match target_id.to_user_id().to_user(&ctx.http).await {
             Ok(user) => format!("L'id de {} est {target_id}", user.tag()),
             Err(e) => format!("Erreur avec l'id {target_id} : {e}"),
         },
         None => String::from("Pas de TargetId dans l'interaction"),
     };
-    InteractionResponse::Message(InteractionMessage {
-        content: result,
-        ephemeral: false,
-        embed: None,
-    })
+    InteractionResponse::Message(InteractionMessage::with_content(content))
 }
 
 pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
-    let option = options.get(0).unwrap().resolved.as_ref().unwrap();
-    let result = match option {
-        CommandDataOptionValue::User(user, _) => format!("L'id de {} est {}", user.tag(), user.id),
-        _ => String::from("L'utilisateur n'a pas pu être trouvé"),
+    let content = if let Some(option) = options.get(0) {
+        if let Some(value) = option.resolved.as_ref() {
+            match value {
+                CommandDataOptionValue::User(user, _) => format!("L'id de {} est {}", user.tag(), user.id),
+                _ => String::from("L'utilisateur n'a pas pu être trouvé"),
+            }
+        } else {
+            "erreur : pas de 'CommandDataOptionValue'".to_owned()
+        }
+    } else {
+        "erreur : pas de 'CommandDataOption'".to_owned()
     };
-    InteractionResponse::Message(InteractionMessage {
-        content: result,
-        ephemeral: false,
-        embed: None,
-    })
+    InteractionResponse::Message(InteractionMessage::with_content(content))
 }
 
 pub fn register_user(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

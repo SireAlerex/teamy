@@ -12,64 +12,59 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
     let groups_container = data.get::<CommandGroupsContainer>();
 
     if groups_container.is_none() {
-        return InteractionResponse::Message(InteractionMessage {
-            content: "Erreur pour accéder aux groupes de commandes".to_owned(),
-            ephemeral: true,
-            embed: None,
-        });
+        return InteractionResponse::Message(InteractionMessage::ephemeral("Erreur pour accéder aux groupes de commandes"));
     }
     let groups_container = groups_container.unwrap().lock().await;
 
-    let groups = &groups_container.groups;
+    let groups_info = &groups_container.groups;
 
-    let title: String;
-    let description: String;
+    let mut title: String = "uninitialised".to_owned();
+    let mut description: String = "uninitialised".to_owned();
     let mut fields: Vec<(&'static str, String, bool)> = Vec::default();
-    let arg = command.data.options.first();
-    if arg.is_some() {
-        let arg =
-            utils::strip_prefix_suffix(arg.unwrap().value.as_ref().unwrap().as_str().unwrap(), '"');
 
-        let x = CommandGroups {
-            groups: groups.clone(),
-        };
-        if let Some(search_group) = x.find_group(&arg) {
-            let command = search_group.find_command(&arg).unwrap();
-            title = command.names[0].to_owned();
-            description = command
-                .desc
-                .unwrap_or("Erreur : pas de description")
-                .to_string();
-            // usage field
-            if let Some(usage) = command.usage {
-                fields.push(("Usage", format!("`{title} {usage}`"), true));
-            }
-            // examples field
-            if !command.examples.is_empty() {
-                fields.push((
-                    "Sample usage",
-                    command
-                        .examples
-                        .iter()
-                        .map(|s| format!("`{title} {s}`"))
-                        .collect::<Vec<String>>()
-                        .join("\n"),
-                    true,
-                ));
-            }
-            // group field
-            fields.push(("Group", search_group.name.to_owned(), true));
-            // aliases
-            if command.names.len() > 1 {
-                fields.push((
-                    "Aliases",
-                    command.names[1..]
-                        .iter()
-                        .map(|s| format!("`{s}`"))
-                        .collect::<Vec<String>>()
-                        .join(","),
-                    true,
-                ));
+    // "/help" with a command name as argument
+    if let Some(raw_arg) = utils::command_option_str(&command.data.options, "commande") {
+        let arg = raw_arg.to_owned();
+        let groups = CommandGroups::new(groups_info.clone());
+
+        if let Some(search_group) = groups.find_group(&arg) {
+            if let Some(command) = search_group.find_command(&arg) {
+                title = command.names[0].to_owned();
+                description = command
+                    .desc
+                    .unwrap_or("Erreur : pas de description")
+                    .to_string();
+                // usage field
+                if let Some(usage) = command.usage {
+                    fields.push(("Usage", format!("`{title} {usage}`"), true));
+                }
+                // examples field
+                if !command.examples.is_empty() {
+                    fields.push((
+                        "Sample usage",
+                        command
+                            .examples
+                            .iter()
+                            .map(|s| format!("`{title} {s}`"))
+                            .collect::<Vec<String>>()
+                            .join("\n"),
+                        true,
+                    ));
+                }
+                // group field
+                fields.push(("Group", search_group.name.to_owned(), true));
+                // aliases
+                if command.names.len() > 1 {
+                    fields.push((
+                        "Aliases",
+                        command.names[1..]
+                            .iter()
+                            .map(|s| format!("`{s}`"))
+                            .collect::<Vec<String>>()
+                            .join(","),
+                        true,
+                    ));
+                }
             }
         } else {
             title = arg.clone();
@@ -83,11 +78,11 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
     } else {
         title = String::from("Help");
         description = String::from("Pour obtenir plus d'informations à propos d'une commande, utilisez la commande en argument.");
-        for group in groups {
+        for group in groups_info {
             let name = group.name;
             let mut command_names: Vec<String> = Vec::default();
             for command in &group.commands {
-                command_names.push(format!("`{}`", command.names.first().unwrap()));
+                command_names.push(format!("`{}`", command.names.first().unwrap_or(&"pas de nom de commandes")));
             }
             let prefixes = group
                 .prefixes
@@ -108,11 +103,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         .color(serenity::utils::Colour::PURPLE)
         .clone();
 
-    InteractionResponse::Message(InteractionMessage {
-        content: String::default(),
-        ephemeral: true,
-        embed: Some(embed),
-    })
+    InteractionResponse::Message(InteractionMessage::new("", true, Some(embed)))
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

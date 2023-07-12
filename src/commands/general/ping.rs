@@ -29,11 +29,7 @@ async fn latency(ctx: &Context) -> String {
 }
 
 pub async fn run(ctx: &Context) -> InteractionResponse {
-    InteractionResponse::Message(InteractionMessage {
-        content: latency(ctx).await,
-        ephemeral: false,
-        embed: None,
-    })
+    InteractionResponse::Message(InteractionMessage::with_content(latency(ctx).await))
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
