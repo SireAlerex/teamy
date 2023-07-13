@@ -12,7 +12,7 @@ pub mod web_scraper;
 use anyhow::anyhow;
 use serenity::async_trait;
 use serenity::client::bridge::gateway::ShardManager;
-use serenity::framework::standard::macros::{group, help, hook};
+use serenity::framework::standard::macros::{help, hook};
 use serenity::framework::standard::{
     help_commands, Args, CommandGroup, CommandResult, HelpOptions,
 };
@@ -34,17 +34,11 @@ use tracing::{error, info};
 
 use command::{CommandGroupInfo, CommandGroups, CommandGroupsContainer, CommandInfo};
 use commands::general;
-use commands::general::{
-    based::BASÉ_COMMAND, bonjour::BONJOUR_COMMAND, id::ID_COMMAND, nerd::NERD_COMMAND,
-    ping::PING_COMMAND, roll::ROLL_COMMAND, slide::SLIDE_COMMAND,
-};
+use commands::general::GENERAL_GROUP;
 use commands::macros;
-use commands::macros::{
-    add::ADD_COMMAND, clear::CLEAR_COMMAND, del::DEL_COMMAND, edit::EDIT_COMMAND,
-    show::SHOW_COMMAND,
-};
+use commands::macros::MACRO_GROUP;
 use commands::pdx;
-use commands::pdx::dd::DD_COMMAND;
+use commands::pdx::PDX_GROUP;
 use interaction::{InteractionMessage, InteractionResponse};
 
 struct ShardManagerContainer;
@@ -176,7 +170,7 @@ impl EventHandler for Bot {
                             .create_application_command(macros::setup::register)
                             .create_application_command(macros::setup::register_message)
                             .create_application_command(pdx::setup::register)
-                        })
+                    })
                     .await,
             ));
         }
@@ -257,20 +251,6 @@ impl EventHandler for Bot {
         }
     }
 }
-
-#[group]
-#[prefix = "macro"]
-#[commands(add, edit, del, show, clear)]
-struct Macro;
-
-#[group]
-#[commands(basé, bonjour, ping, slide, nerd, id, roll)]
-struct General;
-
-#[group]
-#[prefix = "pdx"]
-#[commands(dd)]
-struct Pdx;
 
 #[help]
 #[individual_command_tip = "Pour obtenir plus d'informations à propos d'une commande, utilisez la commande en argument."]

@@ -1,4 +1,7 @@
 use mongodb::bson::oid::ObjectId;
+use serenity::{framework::standard::CommandError, prelude::*};
+
+use crate::{db, utils};
 
 #[derive(
     Debug, serde::Deserialize, serde::Serialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord,
@@ -112,6 +115,12 @@ impl PdxLinks {
             .into_iter()
             .map(|gl| (gl.game, gl.previous))
             .collect()
+    }
+
+    pub async fn db_links(ctx: &Context) -> Result<Self, CommandError> {
+        db::find_filter(ctx, "pdx_links", None)
+            .await?
+            .ok_or(utils::command_error("no pdx link db"))
     }
 
     pub fn update(&mut self, game: PdxGame, link: Option<String>) -> Result<(), String> {

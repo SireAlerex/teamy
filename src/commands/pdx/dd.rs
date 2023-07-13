@@ -1,36 +1,25 @@
-use super::model::{PdxFollow, PdxGame, PdxLinks};
-use crate::interaction::{InteractionResponse, InteractionMessage};
+use super::model::{PdxGame, PdxLinks};
+use crate::interaction::InteractionResponse;
 use crate::{db, utils, web_scraper};
-use bson::doc;
-use serenity::builder::CreateEmbed;
 use serenity::framework::standard::CommandError;
 use serenity::framework::standard::{macros::command, Args, CommandResult};
-use serenity::model::prelude::*;
 use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
+use serenity::model::prelude::*;
 use serenity::prelude::*;
 
+use super::show;
+
 #[command]
-#[description = "Affiche les derniers Dev Diaries de Paradox"]
+#[description = "Mets à jour les derniers DD et les affiche"]
 pub async fn dd(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
-    let user = &msg.author;
-    let channel_id = msg.channel_id;
-
-    let embed = run_intern(ctx, user).await?;
-    show_embed(ctx, embed, channel_id).await
+    let links = run_intern(ctx).await?;
+    show::show_intern(ctx, &msg.author, msg.channel_id, &links).await
 }
 
-async fn run_intern(ctx: &Context, user: &User) -> Result<CreateEmbed, CommandError> {
-    let pdx = pdx_links(ctx).await?;
+async fn run_intern(ctx: &Context) -> Result<PdxLinks, CommandError> {
+    let pdx = PdxLinks::db_links(ctx).await?;
     let results = check_links(&pdx).await?;
-    let final_pdx = update_links(ctx, pdx, results).await?;
-    
-    embed(ctx, user, &final_pdx).await
-}
-
-async fn pdx_links(ctx: &Context) -> Result<PdxLinks, CommandError> {
-    db::find_filter(ctx, "pdx_links", None)
-        .await?
-        .ok_or(utils::command_error("no pdx link db"))
+    update_links(ctx, pdx, results).await
 }
 
 async fn check_links(pdx: &PdxLinks) -> Result<Vec<(PdxGame, Option<String>)>, CommandError> {
@@ -78,51 +67,6 @@ async fn update_links(
     }
 }
 
-async fn embed(ctx: &Context, user: &User, links: &PdxLinks) -> Result<CreateEmbed, CommandError> {
-    let pdx = get_follows(ctx, user.id.to_string()).await?;
-    let mut fields: Vec<(String, String, bool)> = Vec::new();
-    for game in PdxGame::iterator() {
-        if pdx.follows().any(|(g, sub)| (g == game) && sub) {
-            let (title, value) = links
-                .game_links(game)
-                .ok_or(utils::command_error(format!("no links for {game}")))?
-                .embed_value();
-            fields.push((title, value, true));
-        }
-    }
-
-    Ok(CreateEmbed::default()
-            .title("Paradox Dev Diaries")
-            .description("Liens des derniers DD")
-            .fields(fields)
-            .color(serenity::utils::Color::PURPLE)
-            .clone())
-}
-
-async fn show_embed(ctx: &Context, embed: CreateEmbed, channel_id: ChannelId) -> CommandResult {
-    let _: Message = channel_id
-        .send_message(&ctx.http, |m| m.set_embed(embed))
-        .await?;
-
-    Ok(())
-}
-
-async fn get_follows(ctx: &Context, user_id: String) -> Result<PdxFollow, CommandError> {
-    let filter = doc! { "user_id": user_id.clone() };
-    if let Some(pdx) = db::find_filter::<PdxFollow>(ctx, "pdx_follows", filter).await? {
-        Ok(pdx)
-    } else {
-        let pdx = PdxFollow::new(user_id);
-        _ = db::insert(ctx, "pdx_follows", &pdx).await?;
-        Ok(pdx)
-    }
-}
-
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
-    let (content, embed) = match run_intern(ctx, &command.user).await {
-        Ok(e) => (String::new(), Some(e)),
-        Err(err) => (err.to_string(), None)
-    };
-
-    InteractionResponse::Message(InteractionMessage::new(content, true, embed))
+    show::show_interaction(ctx, command, run_intern(ctx).await).await
 }

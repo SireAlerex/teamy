@@ -1,18 +1,23 @@
 use serenity::{
     builder::CreateApplicationCommand,
-    model::prelude::{command::{CommandOptionType, CommandType}, interaction::application_command::ApplicationCommandInteraction},
+    model::prelude::{
+        command::{CommandOptionType, CommandType},
+        interaction::application_command::ApplicationCommandInteraction,
+    },
     prelude::*,
 };
 
-use super::{dd};
-use crate::interaction::{InteractionResponse, InteractionMessage};
+use super::{dd, show};
+use crate::interaction::{InteractionMessage, InteractionResponse};
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
     if let Some(first) = command.data.options.first() {
         match first.name.as_str() {
             "dd" => dd::run(ctx, command).await,
-            "show" => InteractionResponse::Message(InteractionMessage::with_content("pdx run show temp")),
-            _ => InteractionResponse::Message(InteractionMessage::with_content("pdx run unknown name"))
+            "show" => show::run(ctx, command).await,
+            _ => InteractionResponse::Message(InteractionMessage::with_content(
+                "pdx run unknown name",
+            )),
         }
     } else {
         InteractionResponse::Message(InteractionMessage::ephemeral("pdx run no option"))
