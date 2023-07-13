@@ -1,21 +1,30 @@
 use super::model::{PdxFollow, PdxGame, PdxLinks};
+use crate::interaction::{InteractionResponse, InteractionMessage};
 use crate::{db, utils, web_scraper};
 use bson::doc;
 use serenity::builder::CreateEmbed;
 use serenity::framework::standard::CommandError;
 use serenity::framework::standard::{macros::command, Args, CommandResult};
 use serenity::model::prelude::*;
+use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
 use serenity::prelude::*;
 
 #[command]
 #[description = "Affiche les derniers Dev Diaries de Paradox"]
 pub async fn dd(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
+    let user = &msg.author;
+    let channel_id = msg.channel_id;
+
+    let embed = run_intern(ctx, user).await?;
+    show_embed(ctx, embed, channel_id).await
+}
+
+async fn run_intern(ctx: &Context, user: &User) -> Result<CreateEmbed, CommandError> {
     let pdx = pdx_links(ctx).await?;
     let results = check_links(&pdx).await?;
     let final_pdx = update_links(ctx, pdx, results).await?;
-    show(ctx, msg, &final_pdx).await?;
-
-    Ok(())
+    
+    embed(ctx, user, &final_pdx).await
 }
 
 async fn pdx_links(ctx: &Context) -> Result<PdxLinks, CommandError> {
@@ -69,8 +78,8 @@ async fn update_links(
     }
 }
 
-async fn show(ctx: &Context, msg: &Message, links: &PdxLinks) -> CommandResult {
-    let pdx = get_follows(ctx, msg.author.id.to_string()).await?;
+async fn embed(ctx: &Context, user: &User, links: &PdxLinks) -> Result<CreateEmbed, CommandError> {
+    let pdx = get_follows(ctx, user.id.to_string()).await?;
     let mut fields: Vec<(String, String, bool)> = Vec::new();
     for game in PdxGame::iterator() {
         if pdx.follows().any(|(g, sub)| (g == game) && sub) {
@@ -81,16 +90,17 @@ async fn show(ctx: &Context, msg: &Message, links: &PdxLinks) -> CommandResult {
             fields.push((title, value, true));
         }
     }
-    // create emebd and send it
-    let embed = CreateEmbed::default()
-        .title("Paradox Dev Diaries")
-        .description("Liens des derniers DD")
-        .fields(fields)
-        .color(serenity::utils::Color::PURPLE)
-        .clone();
 
-    let _: Message = msg
-        .channel_id
+    Ok(CreateEmbed::default()
+            .title("Paradox Dev Diaries")
+            .description("Liens des derniers DD")
+            .fields(fields)
+            .color(serenity::utils::Color::PURPLE)
+            .clone())
+}
+
+async fn show_embed(ctx: &Context, embed: CreateEmbed, channel_id: ChannelId) -> CommandResult {
+    let _: Message = channel_id
         .send_message(&ctx.http, |m| m.set_embed(embed))
         .await?;
 
@@ -106,4 +116,13 @@ async fn get_follows(ctx: &Context, user_id: String) -> Result<PdxFollow, Comman
         _ = db::insert(ctx, "pdx_follows", &pdx).await?;
         Ok(pdx)
     }
+}
+
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
+    let (content, embed) = match run_intern(ctx, &command.user).await {
+        Ok(e) => (String::new(), Some(e)),
+        Err(err) => (err.to_string(), None)
+    };
+
+    InteractionResponse::Message(InteractionMessage::new(content, true, embed))
 }

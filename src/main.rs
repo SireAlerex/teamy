@@ -43,6 +43,7 @@ use commands::macros::{
     add::ADD_COMMAND, clear::CLEAR_COMMAND, del::DEL_COMMAND, edit::EDIT_COMMAND,
     show::SHOW_COMMAND,
 };
+use commands::pdx;
 use commands::pdx::dd::DD_COMMAND;
 use interaction::{InteractionMessage, InteractionResponse};
 
@@ -160,21 +161,22 @@ impl EventHandler for Bot {
                 guild
                     .set_application_commands(&ctx_arc.http, |commands| {
                         commands
-                            .create_application_command(|c| general::help::register(c))
-                            .create_application_command(|c| general::bonjour::register(c))
-                            .create_application_command(|c| general::slide::register(c))
-                            .create_application_command(|c| general::ping::register(c))
-                            .create_application_command(|c| general::nerd::register_chat_input(c))
-                            .create_application_command(|c| general::nerd::register_message(c))
-                            .create_application_command(|c| general::id::register_user(c))
-                            .create_application_command(|c| general::id::register_chat_input(c))
-                            .create_application_command(|c| general::roll::register(c))
-                            .create_application_command(|c| general::based::register_chat_input(c))
-                            .create_application_command(|c| general::based::register_message(c))
-                            .create_application_command(|c| general::tg::register(c))
-                            .create_application_command(|c| macros::setup::register(c))
-                            .create_application_command(|c| macros::setup::register_message(c))
-                    })
+                            .create_application_command(general::help::register)
+                            .create_application_command(general::bonjour::register)
+                            .create_application_command(general::slide::register)
+                            .create_application_command(general::ping::register)
+                            .create_application_command(general::nerd::register_chat_input)
+                            .create_application_command(general::nerd::register_message)
+                            .create_application_command(general::id::register_user)
+                            .create_application_command(general::id::register_chat_input)
+                            .create_application_command(general::roll::register)
+                            .create_application_command(general::based::register_chat_input)
+                            .create_application_command(general::based::register_message)
+                            .create_application_command(general::tg::register)
+                            .create_application_command(macros::setup::register)
+                            .create_application_command(macros::setup::register_message)
+                            .create_application_command(pdx::setup::register)
+                        })
                     .await,
             ));
         }
@@ -203,6 +205,7 @@ impl EventHandler for Bot {
                             "basé" => general::based::run_chat_input(&command.data.options),
                             "tg" => general::tg::run(&ctx, &command).await,
                             "macro" => macros::setup::run(&ctx, &command).await,
+                            "pdx" => pdx::setup::run(&ctx, &command).await,
                             _ => InteractionResponse::Message(InteractionMessage::ephemeral(
                                 format!("Unkown command ChatInput : {}", command.data.name),
                             )),
