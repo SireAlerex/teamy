@@ -294,7 +294,7 @@ async fn after(ctx: &Context, msg: &Message, command_name: &str, command_result:
 async fn serenity(
     #[shuttle_secrets::Secrets] secret_store: SecretStore,
 ) -> shuttle_serenity::ShuttleSerenity {
-    // Get the discord token set in `Secrets.toml`
+    // Get the discord token set in Secrets.toml
     let Some(token) = secret_store.get("DISCORD_TOKEN") else {
         return Err(anyhow!("'DISCORD_TOKEN' was not found").into());
     };

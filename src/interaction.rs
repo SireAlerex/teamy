@@ -68,16 +68,16 @@ impl InteractionMessage {
     }
 
     fn channel_message_with_source<'a, 'b>(
-        &'b self,
+        self,
         response: &'a mut CreateInteractionResponse<'b>,
-    ) -> &'a mut CreateInteractionResponse {
+    ) -> &'a mut CreateInteractionResponse<'b> {
         response
             .kind(InteractionResponseType::ChannelMessageWithSource)
             .interaction_response_data(move |message| {
                 let m = message
-                    .content(self.content.clone())
+                    .content(self.content)
                     .ephemeral(self.ephemeral);
-                if let Some(e) = self.embed.clone() {
+                if let Some(e) = self.embed {
                     m.add_embed(e)
                 } else {
                     m
