@@ -23,7 +23,7 @@ fn salutation() -> String {
         consts::SALUTATIONS
             .iter()
             .choose(&mut thread_rng())
-            .unwrap()
+            .unwrap_or(&"Bonjour !")
     )
 }
 

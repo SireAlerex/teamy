@@ -9,13 +9,15 @@ use serenity::{
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
     let data = ctx.data.read().await;
-    let groups_container = data.get::<CommandGroupsContainer>();
+    let command_groups_container = data.get::<CommandGroupsContainer>();
 
-    if groups_container.is_none() {
-        return InteractionResponse::Message(InteractionMessage::ephemeral("Erreur pour accéder aux groupes de commandes"));
-    }
-    let groups_container = groups_container.unwrap().lock().await;
-
+    let groups_container = if let Some(container) = command_groups_container {
+        container.lock().await
+    } else {
+        return InteractionResponse::Message(InteractionMessage::ephemeral(
+            "Erreur pour accéder aux groupes de commandes",
+        ));
+    };
     let groups_info = &groups_container.groups;
 
     let mut title: String = "uninitialised".to_owned();
@@ -82,7 +84,10 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
             let name = group.name;
             let mut command_names: Vec<String> = Vec::default();
             for command in &group.commands {
-                command_names.push(format!("`{}`", command.names.first().unwrap_or(&"pas de nom de commandes")));
+                command_names.push(format!(
+                    "`{}`",
+                    command.names.first().unwrap_or(&"pas de nom de commandes")
+                ));
             }
             let prefixes = group
                 .prefixes

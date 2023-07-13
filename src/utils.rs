@@ -146,7 +146,8 @@ pub fn get_option<'a>(data: &'a CommandDataOption, name: &str) -> Option<&'a Val
 }
 
 pub fn command_option<'a>(options: &'a [CommandDataOption], name: &str) -> Option<&'a Value> {
-    options.iter()
+    options
+        .iter()
         .find(|option| option.name == *name)?
         .value
         .as_ref()

@@ -36,16 +36,17 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
     // } else {
     //     "erreur : pas d'argument 'texte'".to_owned()
     // };
-    let result = utils::command_option_str(options, "texte").map_or("erreur: pas de texte?".to_owned(), run);
+    let content =
+        utils::command_option_str(options, "texte").map_or("erreur: pas de texte?".to_owned(), run);
 
-    InteractionResponse::Message(InteractionMessage::with_content(result))
+    InteractionResponse::Message(InteractionMessage::with_content(content))
 }
 
 pub async fn run_message(
     ctx: &Context,
     command: &ApplicationCommandInteraction,
 ) -> InteractionResponse {
-    let result = match command.data.target_id {
+    let content = match command.data.target_id {
         Some(target_id) => {
             let message_id = target_id.to_message_id();
             match command.channel_id.message(&ctx.http, message_id).await {
@@ -55,7 +56,7 @@ pub async fn run_message(
         }
         None => String::from("Erreur pour accéder au MessageId de l'interaction"),
     };
-    InteractionResponse::Message(InteractionMessage::with_content(result))
+    InteractionResponse::Message(InteractionMessage::with_content(content))
 }
 
 pub fn register_message(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

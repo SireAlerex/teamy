@@ -1,9 +1,9 @@
 pub mod command;
 mod commands;
-pub mod interaction;
 pub mod consts;
 #[allow(clippy::impl_trait_in_params)]
 pub mod db;
+pub mod interaction;
 mod loops;
 mod message;
 pub mod utils;
@@ -32,19 +32,19 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info};
 
-use interaction::{InteractionMessage, InteractionResponse};
-use crate::command::{CommandGroupInfo, CommandGroups, CommandGroupsContainer, CommandInfo};
-use crate::commands::general;
-use crate::commands::general::{
+use command::{CommandGroupInfo, CommandGroups, CommandGroupsContainer, CommandInfo};
+use commands::general;
+use commands::general::{
     based::BASÉ_COMMAND, bonjour::BONJOUR_COMMAND, id::ID_COMMAND, nerd::NERD_COMMAND,
     ping::PING_COMMAND, roll::ROLL_COMMAND, slide::SLIDE_COMMAND,
 };
-use crate::commands::macros;
-use crate::commands::macros::{
+use commands::macros;
+use commands::macros::{
     add::ADD_COMMAND, clear::CLEAR_COMMAND, del::DEL_COMMAND, edit::EDIT_COMMAND,
     show::SHOW_COMMAND,
 };
-use crate::commands::pdx::dd::DD_COMMAND;
+use commands::pdx::dd::DD_COMMAND;
+use interaction::{InteractionMessage, InteractionResponse};
 
 struct ShardManagerContainer;
 
@@ -190,33 +190,44 @@ impl EventHandler for Bot {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         match interaction {
             Interaction::ApplicationCommand(command) => {
-                let result: InteractionResponse = match command.data.kind {
-                    CommandType::ChatInput => match command.data.name.as_str() {
-                        "help" => general::help::run(&ctx, &command).await,
-                        "bonjour" => general::bonjour::run(),
-                        "slide" => general::slide::run(&ctx, &command).await,
-                        "ping" => general::ping::run(&ctx).await,
-                        "nerd" => general::nerd::run_chat_input(&command.data.options),
-                        "id" => general::id::run_chat_input(&command.data.options),
-                        "roll" => general::roll::run_chat_input(&command.data.options),
-                        "basé" => general::based::run_chat_input(&command.data.options),
-                        "tg" => general::tg::run(&ctx, &command).await,
-                        "macro" => macros::setup::run(&ctx, &command).await,
-                        _ => InteractionResponse::Message(InteractionMessage::ephemeral(format!("Unkown command ChatInput : {}", command.data.name))),
-                    },
-                    CommandType::Message => match command.data.name.as_str() {
-                        "nerd" => general::nerd::run_message(&ctx, &command).await,
-                        "basé" => general::based::run_message(&ctx, &command).await,
-                        "macro add" => macros::add::run_message_form(&ctx, &command).await,
-                        _ => InteractionResponse::Message(InteractionMessage::ephemeral(format!("Unkown command Message : {}", command.data.name))),
-                    },
-                    CommandType::User => match command.data.name.as_str() {
-                        "id" => general::id::run_user(&ctx, &command).await,
-                        _ => InteractionResponse::Message(InteractionMessage::ephemeral(format!("Unkown command User : {}", command.data.name))),
-                    },
-                    CommandType::Unknown => InteractionResponse::Message(InteractionMessage::ephemeral("Unkown data kind")),
-                    _ => InteractionResponse::Message(InteractionMessage::ephemeral("wildcard data kind")),
-                };
+                let result: InteractionResponse =
+                    match command.data.kind {
+                        CommandType::ChatInput => match command.data.name.as_str() {
+                            "help" => general::help::run(&ctx, &command).await,
+                            "bonjour" => general::bonjour::run(),
+                            "slide" => general::slide::run(&ctx, &command).await,
+                            "ping" => general::ping::run(&ctx).await,
+                            "nerd" => general::nerd::run_chat_input(&command.data.options),
+                            "id" => general::id::run_chat_input(&command.data.options),
+                            "roll" => general::roll::run_chat_input(&command.data.options),
+                            "basé" => general::based::run_chat_input(&command.data.options),
+                            "tg" => general::tg::run(&ctx, &command).await,
+                            "macro" => macros::setup::run(&ctx, &command).await,
+                            _ => InteractionResponse::Message(InteractionMessage::ephemeral(
+                                format!("Unkown command ChatInput : {}", command.data.name),
+                            )),
+                        },
+                        CommandType::Message => match command.data.name.as_str() {
+                            "nerd" => general::nerd::run_message(&ctx, &command).await,
+                            "basé" => general::based::run_message(&ctx, &command).await,
+                            "macro add" => macros::add::run_message_form(&ctx, &command).await,
+                            _ => InteractionResponse::Message(InteractionMessage::ephemeral(
+                                format!("Unkown command Message : {}", command.data.name),
+                            )),
+                        },
+                        CommandType::User => match command.data.name.as_str() {
+                            "id" => general::id::run_user(&ctx, &command).await,
+                            _ => InteractionResponse::Message(InteractionMessage::ephemeral(
+                                format!("Unkown command User : {}", command.data.name),
+                            )),
+                        },
+                        CommandType::Unknown => InteractionResponse::Message(
+                            InteractionMessage::ephemeral("Unkown data kind"),
+                        ),
+                        _ => InteractionResponse::Message(InteractionMessage::ephemeral(
+                            "wildcard data kind",
+                        )),
+                    };
 
                 match result {
                     InteractionResponse::Message(interaction_message) => {
@@ -229,7 +240,9 @@ impl EventHandler for Bot {
             Interaction::ModalSubmit(modal) => {
                 let res = match modal.data.custom_id.as_str() {
                     consts::MACRO_ADD_FORM_ID => macros::add::run_message(&ctx, &modal).await,
-                    _ => InteractionResponse::Message(InteractionMessage::ephemeral("modal inconnu")),
+                    _ => {
+                        InteractionResponse::Message(InteractionMessage::ephemeral("modal inconnu"))
+                    }
                 };
                 if let InteractionResponse::Message(m) = res {
                     m.send_from_modal(&ctx, &modal).await;

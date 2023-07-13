@@ -39,11 +39,19 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
     let user_id = command.user.id.to_string();
     let name = match utils::option_as_str(subcommand, "nom") {
         Some(s) => s.to_owned(),
-        None => return InteractionResponse::Message(InteractionMessage::ephemeral("erreur d'arguments : pas de 'nom'"))
+        None => {
+            return InteractionResponse::Message(InteractionMessage::ephemeral(
+                "erreur d'arguments : pas de 'nom'",
+            ))
+        }
     };
     let args = match utils::option_as_str(subcommand, "arguments") {
         Some(s) => s.to_owned(),
-        None => return InteractionResponse::Message(InteractionMessage::ephemeral("erreur d'arguments : pas de 'arguments'"))
+        None => {
+            return InteractionResponse::Message(InteractionMessage::ephemeral(
+                "erreur d'arguments : pas de 'arguments'",
+            ))
+        }
     };
     let content = match edit_macro(ctx, user_id, name, args).await {
         Ok(_) => "La macro a bien été modifiée".to_string(),

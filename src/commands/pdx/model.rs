@@ -114,12 +114,16 @@ impl PdxLinks {
             .collect()
     }
 
-    pub fn update(&mut self, game: PdxGame, new_link: &str) -> Result<(), String> {
-        if let Some(gl) = self.games.iter_mut().find(|gl| gl.game == game) {
-            gl.update(new_link.to_owned());
-            Ok(())
+    pub fn update(&mut self, game: PdxGame, link: Option<String>) -> Result<(), String> {
+        if let Some(new_link) = link {
+            if let Some(gl) = self.games.iter_mut().find(|gl| gl.game == game) {
+                gl.update(new_link);
+                Ok(())
+            } else {
+                Err(format!("Le jeu {game:?} ne fait pas partie du PdxLinks"))
+            }
         } else {
-            Err(format!("Le jeu {game:?} ne fait pas partie du PdxLinks"))
+            Ok(())
         }
     }
 

@@ -35,7 +35,11 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
     let subcommand = &command.data.options[0];
     let name = match utils::option_as_str(subcommand, "nom") {
         Some(s) => s.to_owned(),
-        None => return InteractionResponse::Message(InteractionMessage::ephemeral("erreur d'arguments : pas de 'nom'"))
+        None => {
+            return InteractionResponse::Message(InteractionMessage::ephemeral(
+                "erreur d'arguments : pas de 'nom'",
+            ))
+        }
     };
     let content = match del_macro(ctx, command.user.id.to_string(), name).await {
         Ok(_) => "La macro a bien été supprimée".to_string(),

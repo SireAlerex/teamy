@@ -1,8 +1,8 @@
-use serenity::model::prelude::interaction::InteractionResponseType;
+use serenity::builder::{CreateEmbed, CreateInteractionResponse};
 use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
 use serenity::model::prelude::interaction::modal::ModalSubmitInteraction;
+use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::prelude::*;
-use serenity::builder::{CreateEmbed, CreateInteractionResponse};
 
 use crate::utils;
 
@@ -20,24 +20,34 @@ pub struct InteractionMessage {
 
 impl InteractionMessage {
     pub fn new<T: Into<String>>(content: T, ephemeral: bool, embed: Option<CreateEmbed>) -> Self {
-        Self { content: content.into(), ephemeral, embed }
+        Self {
+            content: content.into(),
+            ephemeral,
+            embed,
+        }
     }
 
     pub fn ephemeral<T: Into<String>>(content: T) -> Self {
-        Self { content: content.into(), ephemeral: true, embed: None }
+        Self {
+            content: content.into(),
+            ephemeral: true,
+            embed: None,
+        }
     }
 
     pub fn with_content<T: Into<String>>(content: T) -> Self {
-        Self { content: content.into(), ephemeral: false, embed: None }
+        Self {
+            content: content.into(),
+            ephemeral: false,
+            embed: None,
+        }
     }
 
-    pub async fn send_from_command(
-        self,
-        ctx: &Context,
-        command: &ApplicationCommandInteraction,
-    ) {
+    pub async fn send_from_command(self, ctx: &Context, command: &ApplicationCommandInteraction) {
         if let Err(why) = command
-            .create_interaction_response(&ctx.http, |response| self.channel_message_with_source(response))
+            .create_interaction_response(&ctx.http, |response| {
+                self.channel_message_with_source(response)
+            })
             .await
         {
             let error_message = format!("Erreur lors de la réponse à l'interaction : {why}");
@@ -45,13 +55,11 @@ impl InteractionMessage {
         }
     }
 
-    pub async fn send_from_modal(
-        self,
-        ctx: &Context,
-        modal: &ModalSubmitInteraction
-    ) {
+    pub async fn send_from_modal(self, ctx: &Context, modal: &ModalSubmitInteraction) {
         if let Err(why) = modal
-            .create_interaction_response(&ctx.http, |response| self.channel_message_with_source(response))
+            .create_interaction_response(&ctx.http, |response| {
+                self.channel_message_with_source(response)
+            })
             .await
         {
             let error_message = format!("Erreur lors de la réponse à l'interaction : {why}");
@@ -59,15 +67,20 @@ impl InteractionMessage {
         }
     }
 
-    fn channel_message_with_source<'a, 'b>(&'b self, response: &'a mut CreateInteractionResponse<'b>) -> &'a mut CreateInteractionResponse {
-        let content = self.content.clone();
+    fn channel_message_with_source<'a, 'b>(
+        &'b self,
+        response: &'a mut CreateInteractionResponse<'b>,
+    ) -> &'a mut CreateInteractionResponse {
         response
             .kind(InteractionResponseType::ChannelMessageWithSource)
             .interaction_response_data(move |message| {
+                let m = message
+                    .content(self.content.clone())
+                    .ephemeral(self.ephemeral);
                 if let Some(e) = self.embed.clone() {
-                    message.content(content).ephemeral(self.ephemeral).add_embed(e)
+                    m.add_embed(e)
                 } else {
-                    message.content(content).ephemeral(self.ephemeral)
+                    m
                 }
             })
     }

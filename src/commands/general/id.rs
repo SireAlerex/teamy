@@ -50,7 +50,9 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
     let content = if let Some(option) = options.get(0) {
         if let Some(value) = option.resolved.as_ref() {
             match value {
-                CommandDataOptionValue::User(user, _) => format!("L'id de {} est {}", user.tag(), user.id),
+                CommandDataOptionValue::User(user, _) => {
+                    format!("L'id de {} est {}", user.tag(), user.id)
+                }
                 _ => String::from("L'utilisateur n'a pas pu être trouvé"),
             }
         } else {

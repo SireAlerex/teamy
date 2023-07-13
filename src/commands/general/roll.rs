@@ -129,7 +129,10 @@ impl Roll {
         let Ok(res) = sum(&rolls, self.modifier) else {
             return Err("modifieur conversion error");
         };
-        let message = format!("{self} {}", show_res(&s, res.to_string(), self.number, self.modifier));
+        let message = format!(
+            "{self} {}",
+            show_res(&s, res.to_string(), self.number, self.modifier)
+        );
         Ok(RollResult {
             roll: self,
             rolls,
@@ -420,7 +423,6 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
                 _ => (),
             }
         }
-        
     }
     let Ok(n): Result<u64, _> = n.try_into() else {
         return InteractionResponse::Message(InteractionMessage::ephemeral("erreur dice number conversion"));

@@ -42,25 +42,15 @@ async fn check_links(pdx: &PdxLinks) -> Result<Vec<(PdxGame, Option<String>)>, C
     }
     for (_, res) in &results {
         if let Err(e) = res {
-            return Err(utils::command_error(format!(
-                "link threaded error : {e}")));
+            return Err(utils::command_error(format!("link threaded error : {e}")));
         }
     }
     Ok(results
         .into_iter()
         .map(|(game, res)| (game, res.unwrap_or(None)))
         .collect())
-    // if let Some((_, err)) = results.iter().find(|(_, res)| res.is_err()) {
-    //     Err(utils::command_error(format!(
-    //         "link threaded error : {}",
-    //         err.as_ref().unwrap_err()
-    //     )))
-    // } else {
-        
-    // }
 }
 
-#[allow(clippy::unwrap_used)]
 async fn update_links(
     ctx: &Context,
     pdx: PdxLinks,
@@ -70,12 +60,8 @@ async fn update_links(
         Ok(pdx)
     } else {
         let mut new_pdx = pdx.clone();
-        for (game, link) in new_links
-            .iter()
-            .filter(|(_, o)| o.is_some())
-            .map(|(g, o)| (g, o.as_ref().unwrap()))
-        {
-            new_pdx.update(*game, link)?;
+        for (game, link) in new_links {
+            new_pdx.update(game, link)?;
         }
         db::delete(ctx, "pdx_links", &pdx).await?;
         let _: bson::Bson = db::insert(ctx, "pdx_links", &new_pdx).await?;

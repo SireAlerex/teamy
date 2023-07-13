@@ -49,11 +49,19 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
     let subcommand = &command.data.options[0];
     let name = match utils::option_as_str(subcommand, "nom") {
         Some(s) => s.to_owned(),
-        None => return InteractionResponse::Message(InteractionMessage::ephemeral("erreur d'arguments : pas de 'nom'"))
+        None => {
+            return InteractionResponse::Message(InteractionMessage::ephemeral(
+                "erreur d'arguments : pas de 'nom'",
+            ))
+        }
     };
     let command_name = match utils::option_as_str(subcommand, "commande") {
         Some(s) => s.to_owned(),
-        None => return InteractionResponse::Message(InteractionMessage::ephemeral("erreur d'arguments : pas de 'nom'"))
+        None => {
+            return InteractionResponse::Message(InteractionMessage::ephemeral(
+                "erreur d'arguments : pas de 'nom'",
+            ))
+        }
     };
     let args = utils::option_as_str(subcommand, "arguments").map(std::borrow::ToOwned::to_owned);
     let content = match add_macro(ctx, command.user.id.to_string(), name, command_name, args).await
@@ -163,7 +171,11 @@ pub async fn run_message(ctx: &Context, modal: &ModalSubmitInteraction) -> Inter
     // take name from modal and completes macro
     let component = match &modal.data.components.first() {
         Some(action_row) => action_row.components.first(),
-        None => return InteractionResponse::Message(InteractionMessage::ephemeral("erreur : action row component"))
+        None => {
+            return InteractionResponse::Message(InteractionMessage::ephemeral(
+                "erreur : action row component",
+            ))
+        }
     };
     let content = if let Some(ActionRowComponent::InputText(input)) = component {
         if input.custom_id == consts::MACRO_ADD_FORM_NAME {

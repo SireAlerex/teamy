@@ -13,7 +13,9 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         "show" => show::run(ctx, command).await,
         "edit" => edit::run(ctx, command).await,
         "clear" => clear::run(ctx, command).await,
-        _ => InteractionResponse::Message(InteractionMessage::ephemeral("macro_unknown_subcommand")),
+        _ => {
+            InteractionResponse::Message(InteractionMessage::ephemeral("macro_unknown_subcommand"))
+        }
     }
 }
 

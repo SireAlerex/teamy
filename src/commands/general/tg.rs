@@ -119,12 +119,8 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         "serv" => {
             if command.guild_id.is_some() && utils::admin_command(command) {
                 if let Some(guild_id) = command.guild_id {
-                    match toggle_mute(
-                        ctx,
-                        "mute_guilds",
-                        db::Guild::builder(guild_id.to_string()),
-                    )
-                    .await
+                    match toggle_mute(ctx, "mute_guilds", db::Guild::builder(guild_id.to_string()))
+                        .await
                     {
                         Ok(b) => {
                             if b {
@@ -138,7 +134,6 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
                 } else {
                     "pas de guild_id".to_owned()
                 }
-                
             } else {
                 String::from("Vous devez être admin pour utiliser cette commande")
             }
