@@ -26,13 +26,12 @@ impl Interaction {
     }
 
     pub async fn send(self, ctx: &Context) {
-        match self.response {
-            Response::Message(msg) => match self.serenity_interaction {
+        if let Response::Message(msg) = self.response {
+            match self.serenity_interaction {
                 ApplicationCommand(command) => msg.send_from_command(ctx, &command).await,
                 ModalSubmit(modal) => msg.send_from_modal(ctx, &modal).await,
                 _ => (),
-            },
-            _ => (),
+            }
         }
     }
 }

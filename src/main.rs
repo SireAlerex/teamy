@@ -1,6 +1,7 @@
 mod bot;
 pub mod command_info;
 mod commands;
+mod containers;
 #[allow(clippy::impl_trait_in_params)]
 pub mod db;
 mod framework;
@@ -12,52 +13,20 @@ pub mod utils;
 pub mod web_scraper;
 
 use anyhow::anyhow;
-use serenity::client::bridge::gateway::ShardManager;
 use serenity::http::Http;
 use serenity::model::prelude::{ChannelId, GuildId};
 use serenity::prelude::*;
 use shuttle_secrets::SecretStore;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 use bot::Bot;
 use command_info::CommandGroupsContainer;
+use containers::{
+    DatabaseUri, DatabaseUriContainer, GuildGroup, GuildIdContainer, LogChanIdContainer,
+    ShardManagerContainer, TempChanContainer,
+};
 use interaction::{InteractionMessage, Response};
-
-struct ShardManagerContainer;
-
-impl TypeMapKey for ShardManagerContainer {
-    type Value = Arc<Mutex<ShardManager>>;
-}
-
-struct GuildGroup(Vec<GuildId>);
-
-struct GuildIdContainer;
-
-impl TypeMapKey for GuildIdContainer {
-    type Value = Arc<GuildGroup>;
-}
-
-struct LogChanIdContainer;
-
-impl TypeMapKey for LogChanIdContainer {
-    type Value = Arc<ChannelId>;
-}
-
-struct DatabaseUri(String);
-
-struct DatabaseUriContainer;
-
-impl TypeMapKey for DatabaseUriContainer {
-    type Value = Arc<DatabaseUri>;
-}
-
-struct TempChanContainer;
-
-impl TypeMapKey for TempChanContainer {
-    type Value = Arc<ChannelId>;
-}
 
 #[shuttle_runtime::main]
 async fn serenity(

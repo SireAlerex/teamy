@@ -63,13 +63,13 @@ async fn normal_message(ctx: &Context, msg: &Message) {
 
     if let Some(content) = match utils::first_letter(&msg.content) {
         None => None, // Ignore empty messages
-        Some('!') => Some(commands::macros::r#macro::handle_macro(&ctx, &msg).await),
-        _ => match message::handle_reaction(&ctx, &msg).await {
+        Some('!') => Some(commands::macros::r#macro::handle_macro(ctx, msg).await),
+        _ => match message::handle_reaction(ctx, msg).await {
             Ok(s) => Some(s),
             Err(e) => Some(e.to_string()),
         },
     } {
-        utils::say_or_error(&ctx, msg.channel_id, &content).await;
+        utils::say_or_error(ctx, msg.channel_id, &content).await;
     }
 }
 
