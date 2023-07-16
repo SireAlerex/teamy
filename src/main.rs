@@ -2,6 +2,7 @@ pub mod command_info;
 mod commands;
 #[allow(clippy::impl_trait_in_params)]
 pub mod db;
+mod framework;
 pub mod interaction;
 mod loops;
 mod message;
@@ -12,34 +13,25 @@ pub mod web_scraper;
 use anyhow::anyhow;
 use serenity::async_trait;
 use serenity::client::bridge::gateway::ShardManager;
-use serenity::framework::standard::macros::{help, hook};
-use serenity::framework::standard::{
-    help_commands, Args, CommandGroup, CommandResult, HelpOptions,
-};
-use serenity::framework::StandardFramework;
 use serenity::http::Http;
 use serenity::model::application::command::Command;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::model::prelude::command::CommandType;
 use serenity::model::prelude::interaction::Interaction;
-use serenity::model::prelude::{ChannelId, GuildId, UserId};
+use serenity::model::prelude::{ChannelId, GuildId};
 use serenity::prelude::*;
 use shuttle_secrets::SecretStore;
-use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::{error, info};
 
-use command_info::{CommandGroupInfo, CommandGroups, CommandGroupsContainer, CommandInfo};
+use command_info::CommandGroupsContainer;
 use commands::general;
-use commands::general::GENERAL_GROUP;
 use commands::macros;
-use commands::macros::MACRO_GROUP;
 use commands::pdx;
-use commands::pdx::PDX_GROUP;
 use interaction::{InteractionMessage, InteractionResponse};
 
 struct ShardManagerContainer;
@@ -245,43 +237,6 @@ impl EventHandler for Bot {
     }
 }
 
-#[help]
-#[individual_command_tip = "Pour obtenir plus d'informations à propos d'une commande, utilisez la commande en argument."]
-#[command_not_found_text = "Commande non trouvée : '{}'."]
-#[max_levenshtein_distance(3)]
-#[lacking_permissions = "Hide"]
-async fn my_help(
-    ctx: &Context,
-    msg: &Message,
-    args: Args,
-    help_options: &'static HelpOptions,
-    groups: &[&'static CommandGroup],
-    owners: HashSet<UserId>,
-) -> CommandResult {
-    let _: Message =
-        help_commands::with_embeds(ctx, msg, args, help_options, groups, owners).await?;
-    Ok(())
-}
-
-#[hook]
-async fn after(ctx: &Context, msg: &Message, command_name: &str, command_result: CommandResult) {
-    match command_result {
-        Ok(()) => info!("Processed command '{}'", command_name),
-        Err(why) => {
-            error!(
-                "Command '{}' returned error {:?} (message was '{}')",
-                command_name, why, msg.content
-            );
-            utils::say_or_error(
-                ctx,
-                msg.channel_id,
-                format!("Erreur lors de la commande : {why}"),
-            )
-            .await;
-        }
-    }
-}
-
 #[shuttle_runtime::main]
 async fn serenity(
     #[shuttle_secrets::Secrets] secret_store: SecretStore,
@@ -290,48 +245,8 @@ async fn serenity(
     let token = secrets::get(&secret_store, "DISCORD_TOKEN")?;
     let http = Http::new(&token);
 
-    let (owners, _bot_id) = match http.get_current_application_info().await {
-        Ok(info) => {
-            let mut owners = HashSet::new();
-            owners.insert(info.owner.id);
-
-            (owners, info.id)
-        }
-        Err(why) => return Err(anyhow!("Could not access application info: {why:?}").into()),
-    };
-
-    let framework = StandardFramework::new()
-        .configure(|c| c.owners(owners).prefix("$"))
-        .after(after)
-        .help(&MY_HELP)
-        .group(&GENERAL_GROUP)
-        .group(&MACRO_GROUP)
-        .group(&PDX_GROUP);
-
-    let static_groups = vec![&GENERAL_GROUP, &MACRO_GROUP, &PDX_GROUP];
-    let groups: CommandGroups = CommandGroups {
-        groups: {
-            let mut groups: Vec<CommandGroupInfo> = Vec::default();
-            for group in &static_groups {
-                let mut commands: Vec<CommandInfo> = Vec::default();
-                for command in group.options.commands {
-                    let x = CommandInfo {
-                        names: command.options.names,
-                        desc: command.options.desc,
-                        usage: command.options.usage,
-                        examples: command.options.examples,
-                    };
-                    commands.push(x);
-                }
-                groups.push(CommandGroupInfo {
-                    name: group.name,
-                    commands,
-                    prefixes: group.options.prefixes,
-                });
-            }
-            groups
-        },
-    };
+    // Create framework for bot
+    let framework = framework::get_framework(http).await?;
 
     // Set gateway intents, which decides what events the bot will be notified about
     let intents = GatewayIntents::GUILD_MESSAGES
@@ -344,7 +259,7 @@ async fn serenity(
             is_loop_running: AtomicBool::new(false),
         })
         .await
-        .expect("Error creating client");
+        .map_err(|e| anyhow!("Error creating client : {e}"))?;
 
     let guild_group = GuildGroup(secrets::parse_objects::<u64, GuildId>(
         &secret_store,
@@ -353,6 +268,7 @@ async fn serenity(
     let log_chan = ChannelId(secrets::parse(&secret_store, "LOG_CHAN_ID")?);
     let db_uri = DatabaseUri(secrets::get(&secret_store, "DATABASE_URI")?);
     let temp_chan = ChannelId(secrets::parse(&secret_store, "TEMP_CHAN")?);
+    let groups = framework::get_command_groups();
 
     {
         let mut data = client.data.write().await;

@@ -16,9 +16,7 @@ pub struct CommandGroupInfo {
     pub prefixes: &'static [&'static str],
 }
 
-pub struct CommandGroups {
-    pub groups: Vec<CommandGroupInfo>,
-}
+pub struct CommandGroups(pub Vec<CommandGroupInfo>);
 
 pub struct CommandGroupsContainer;
 
@@ -36,18 +34,18 @@ impl CommandGroupInfo {
 
 impl CommandGroups {
     pub fn new(groups: Vec<CommandGroupInfo>) -> Self {
-        Self { groups }
+        CommandGroups(groups)
     }
 
     pub fn find_group(&self, command_name: &str) -> Option<&CommandGroupInfo> {
-        self.groups
+        self.0
             .iter()
             .find(|group| group.find_command(command_name).is_some())
     }
 
     pub fn find_command(&self, name: &str) -> Option<&CommandInfo> {
         if let Some(group) = self
-            .groups
+            .0
             .iter()
             .find(|group| group.find_command(name).is_some())
         {

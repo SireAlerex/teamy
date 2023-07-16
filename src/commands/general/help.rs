@@ -16,7 +16,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
             "Erreur pour accéder aux groupes de commandes",
         ));
     };
-    let groups_info = &groups_container.groups;
+    let groups_info = &groups_container.0;
 
     let mut title: String = "uninitialised".to_owned();
     let mut description: String = "uninitialised".to_owned();
