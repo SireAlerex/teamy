@@ -16,7 +16,7 @@ use crate::command_info::{CommandGroupInfo, CommandGroups, CommandInfo};
 use crate::commands::general::GENERAL_GROUP;
 use crate::commands::macros::MACRO_GROUP;
 use crate::commands::pdx::PDX_GROUP;
-use crate::utils;
+use crate::{commands, message, utils};
 
 #[help]
 #[individual_command_tip = "Pour obtenir plus d'informations à propos d'une commande, utilisez la commande en argument."]
@@ -55,6 +55,24 @@ async fn after(ctx: &Context, msg: &Message, command_name: &str, command_result:
     }
 }
 
+#[hook]
+async fn normal_message(ctx: &Context, msg: &Message) {
+    if msg.author.bot {
+        return;
+    }
+
+    if let Some(content) = match utils::first_letter(&msg.content) {
+        None => None, // Ignore empty messages
+        Some('!') => Some(commands::macros::r#macro::handle_macro(&ctx, &msg).await),
+        _ => match message::handle_reaction(&ctx, &msg).await {
+            Ok(s) => Some(s),
+            Err(e) => Some(e.to_string()),
+        },
+    } {
+        utils::say_or_error(&ctx, msg.channel_id, &content).await;
+    }
+}
+
 pub async fn get_framework(http: Http) -> Result<StandardFramework, Error> {
     let (owners, _bot_id) = match http.get_current_application_info().await {
         Ok(info) => {
@@ -70,6 +88,7 @@ pub async fn get_framework(http: Http) -> Result<StandardFramework, Error> {
         .configure(|c| c.owners(owners).prefix("$"))
         .after(after)
         .help(&MY_HELP)
+        .normal_message(normal_message)
         .group(&GENERAL_GROUP)
         .group(&MACRO_GROUP)
         .group(&PDX_GROUP);
