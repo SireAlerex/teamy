@@ -1,5 +1,5 @@
 use super::r#macro::{test_macro, Macro, TempMacro};
-use crate::{consts, db, utils};
+use crate::{db, interaction, utils};
 use crate::{InteractionMessage, InteractionResponse};
 use bson::doc;
 use serenity::framework::standard::macros::command;
@@ -10,7 +10,6 @@ use serenity::model::prelude::interaction::modal::ModalSubmitInteraction;
 use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::model::prelude::Message;
 use serenity::prelude::Context;
-use tracing::info;
 
 #[command]
 #[description = "crée une macro"]
@@ -45,7 +44,6 @@ async fn add_macro(
 }
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
-    info!("help applicationcommandinteraction:\n{command:#?}");
     let subcommand = &command.data.options[0];
     let name = match utils::option_as_str(subcommand, "nom") {
         Some(s) => s.to_owned(),
@@ -178,7 +176,7 @@ pub async fn run_message(ctx: &Context, modal: &ModalSubmitInteraction) -> Inter
         }
     };
     let content = if let Some(ActionRowComponent::InputText(input)) = component {
-        if input.custom_id == consts::MACRO_ADD_FORM_NAME {
+        if input.custom_id == interaction::MACRO_ADD_FORM_NAME {
             match complete_macro(ctx, modal.user.id.to_string(), input.value.clone()).await {
                 Ok(_) => "La macro a bien été ajouté".to_string(),
                 Err(e) => format!("erreur lors de la complétion de la macro : {e}"),
@@ -204,12 +202,12 @@ pub async fn modal(ctx: &Context, command: &ApplicationCommandInteraction) {
                             input.create_action_row(|f| {
                                 f.create_input_text(|t| {
                                     t.label("Nom de la macro")
-                                        .custom_id(consts::MACRO_ADD_FORM_NAME)
+                                        .custom_id(interaction::MACRO_ADD_FORM_NAME)
                                         .style(InputTextStyle::Short)
                                 })
                             })
                         })
-                        .custom_id(consts::MACRO_ADD_FORM_ID)
+                        .custom_id(interaction::MACRO_ADD_FORM_ID)
                 })
         })
         .await

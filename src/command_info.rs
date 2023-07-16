@@ -1,7 +1,6 @@
 use serenity::prelude::*;
 use std::sync::Arc;
 
-// struct containing info about a command
 #[derive(Debug, Clone)]
 pub struct CommandInfo {
     pub names: &'static [&'static str],
@@ -10,7 +9,6 @@ pub struct CommandInfo {
     pub examples: &'static [&'static str],
 }
 
-// struct containing info about a group command
 #[derive(Clone)]
 pub struct CommandGroupInfo {
     pub name: &'static str,
@@ -25,7 +23,7 @@ pub struct CommandGroups {
 pub struct CommandGroupsContainer;
 
 impl TypeMapKey for CommandGroupsContainer {
-    type Value = Arc<tokio::sync::Mutex<CommandGroups>>;
+    type Value = Arc<CommandGroups>;
 }
 
 impl CommandGroupInfo {

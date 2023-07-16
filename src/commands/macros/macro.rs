@@ -87,7 +87,7 @@ pub async fn test_macro(
         "roll" => {
             roll::roll_intern(
                 ctx,
-                temp_chan,
+                &temp_chan,
                 Args::new(&args.clone().unwrap_or(String::new()), &[]),
             )
             .await?

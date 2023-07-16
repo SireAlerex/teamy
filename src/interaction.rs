@@ -6,6 +6,10 @@ use serenity::prelude::*;
 
 use crate::utils;
 
+// interaction modal custom ids
+pub const MACRO_ADD_FORM_ID: &str = "macro_add_form";
+pub const MACRO_ADD_FORM_NAME: &str = "macro_add_name";
+
 pub enum InteractionResponse {
     Message(InteractionMessage),
     Modal,
@@ -74,9 +78,7 @@ impl InteractionMessage {
         response
             .kind(InteractionResponseType::ChannelMessageWithSource)
             .interaction_response_data(move |message| {
-                let m = message
-                    .content(self.content)
-                    .ephemeral(self.ephemeral);
+                let m = message.content(self.content).ephemeral(self.ephemeral);
                 if let Some(e) = self.embed {
                     m.add_embed(e)
                 } else {

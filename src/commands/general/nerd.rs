@@ -26,16 +26,6 @@ pub fn run(text: &str) -> String {
 }
 
 pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
-    // let s = if let Some(data) = options.get(0) {
-    //     utils::option_as_str(data, "texte")
-    // } else {
-    //     None
-    // };
-    // let content = if let Some(text) = s {
-    //     run(text)
-    // } else {
-    //     "erreur : pas d'argument 'texte'".to_owned()
-    // };
     let content =
         utils::command_option_str(options, "texte").map_or("erreur: pas de texte?".to_owned(), run);
 

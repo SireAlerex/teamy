@@ -1,4 +1,4 @@
-use crate::command::{CommandGroups, CommandGroupsContainer};
+use crate::command_info::{CommandGroups, CommandGroupsContainer};
 use crate::{utils, InteractionMessage, InteractionResponse};
 use serenity::model::application::command::CommandOptionType;
 use serenity::{
@@ -11,9 +11,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
     let data = ctx.data.read().await;
     let command_groups_container = data.get::<CommandGroupsContainer>();
 
-    let groups_container = if let Some(container) = command_groups_container {
-        container.lock().await
-    } else {
+    let Some(groups_container) =  command_groups_container else {
         return InteractionResponse::Message(InteractionMessage::ephemeral(
             "Erreur pour accéder aux groupes de commandes",
         ));

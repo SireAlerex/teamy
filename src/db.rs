@@ -70,11 +70,8 @@ pub fn mongodb_error<T: Into<String>>(message: T) -> Error {
 async fn get_client(ctx: &Context) -> Result<Client, Error> {
     let data = ctx.data.read().await;
     if let Some(db) = data.get::<DatabaseUriContainer>() {
-        let options = ClientOptions::parse_with_resolver_config(
-            &db.lock().await.db_uri,
-            ResolverConfig::cloudflare(),
-        )
-        .await?;
+        let options =
+            ClientOptions::parse_with_resolver_config(&db.0, ResolverConfig::cloudflare()).await?;
         Client::with_options(options)
     } else {
         Err(mongodb_error("no db uri"))

@@ -1,11 +1,12 @@
 use crate::commands::general::nerd;
-use crate::consts;
 use crate::db;
 use rand::seq::SliceRandom;
 use serenity::{
     model::{channel::Message, prelude::*},
     prelude::*,
 };
+
+pub static SALUTATIONS: [&str; 4] = ["Bonjour", "Salut", "Coucou", "Yo"];
 
 #[derive(Debug)]
 pub enum HandleMessageError {
@@ -93,7 +94,7 @@ async fn emoji_or(ctx: &Context, guild_id: Option<GuildId>, name: &str) -> Strin
 }
 
 fn bot(message: &str) -> bool {
-    present(message, &consts::BOT)
+    present(message, &["bot", "robot", "teamy"])
 }
 
 fn ou(message: &str) -> Option<&str> {
@@ -167,22 +168,25 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, Han
 
     // string reactions
     // bonjour bot
-    if bot(&user_message) && present(&user_message, &consts::SALUTATIONS) {
-        return Ok(format!("{} {} !", choose(&consts::SALUTATIONS), user_nick));
+    if bot(&user_message) && present(&user_message, &SALUTATIONS) {
+        return Ok(format!("{} {} !", choose(&SALUTATIONS), user_nick));
     }
 
     // societer
-    if present(&user_message, &consts::SOCIETER) {
+    if present(
+        &user_message,
+        &["société", "societe", "societer", "saucisse"],
+    ) {
         return Ok(emoji_or(ctx, msg.guild_id, "saucisse").await);
     }
 
     // sus
-    if present(&user_message, &consts::SUS) {
+    if present(&user_message, &["sus", "sussy"]) {
         return Ok(emoji_or(ctx, msg.guild_id, "afungus").await);
     }
 
     // civ bedge
-    if present(&user_message, &consts::ATTENDRE)
+    if present(&user_message, &["attend", "attends", "attendre"])
         && present(&user_message, &["civ"])
         && present(&user_message, &["Thomas"])
     {
@@ -190,12 +194,12 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, Han
     }
 
     // cum
-    if present(&user_message, &consts::CUM) {
+    if present(&user_message, &["cum", "cummies", "cummy"]) {
         return Ok(":milk:".to_owned());
     }
 
     // source
-    if present(&user_message, &consts::SOURCE) {
+    if present(&user_message, &["source ?", "sources ?"]) {
         return Ok("Ça m'est apparu dans un rêve".to_owned());
     }
 
@@ -205,27 +209,41 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, Han
     }
 
     // quoi
-    if endwith(&user_message, &consts::QUOI) {
-        return Ok(choose(&consts::QUOI_REPONSE).to_owned());
+    if endwith(&user_message, &["quoi", "quoi ?"]) {
+        return Ok(choose(&["quoicoubeh", "feur"]).to_owned());
     }
 
     // good bot
-    if bot(&user_message) && present(&user_message, &consts::GOOD) {
-        return Ok(choose(&consts::GOOD_REACTION).to_owned());
+    if bot(&user_message) && present(&user_message, &["bon", "good", "gentil", "nice"]) {
+        return Ok(choose(&[
+            ":smiley:",
+            ":smile:",
+            ":grin:",
+            ":blush:",
+            ":smiling_face_with_3_hearts:",
+        ])
+        .to_owned());
     }
 
     // bad bot
-    if bot(&user_message) && present(&user_message, &consts::BAD) {
-        let reaction = choose(&consts::BAD_REACTION);
-        match reaction {
-            ":nerd:" => return Ok(nerd::run(&user_message)),
-            _ => return Ok(reaction.to_owned()),
-        }
+    if bot(&user_message) && present(&user_message, &["bad", "mauvais", "méchant"]) {
+        let reaction = choose(&[
+            ":nerd:",
+            ":pensive:",
+            ":worried:",
+            ":slight_frown:",
+            ":frowning2:",
+            ":cry:",
+        ]);
+        return match reaction {
+            ":nerd:" => Ok(nerd::run(&user_message)),
+            _ => Ok(reaction.to_owned()),
+        };
     }
 
     // gay bot
     if bot(&user_message) && present(&user_message, &["gay"]) {
-        return Ok(choose(&consts::HOT).to_owned());
+        return Ok(choose(&[":hot_face:", ":shushing_face:"]).to_owned());
     }
 
     // ou

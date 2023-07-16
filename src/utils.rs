@@ -126,18 +126,17 @@ pub fn command_error<T: Into<String>>(message: T) -> CommandError {
     Box::<dyn std::error::Error + Send + Sync>::from(message.into())
 }
 
-pub async fn get_temp_chan(ctx: &Context) -> Option<ChannelId> {
+pub async fn get_temp_chan(ctx: &Context) -> Option<Arc<ChannelId>> {
     let data = ctx.data.read().await;
     let Some(temp_chan_mutex) = data.get::<crate::TempChanContainer>() else {
         error!("there was a problem getting the temp chan");
         return None;
     };
-    let temp_chan_id = temp_chan_mutex.lock().await;
-    Some(*temp_chan_id)
+    let temp_chan_id = temp_chan_mutex;
+    Some(Arc::clone(temp_chan_id))
 }
 
-// TODO: remove pub after refactor
-pub fn get_option<'a>(data: &'a CommandDataOption, name: &str) -> Option<&'a Value> {
+fn get_option<'a>(data: &'a CommandDataOption, name: &str) -> Option<&'a Value> {
     data.options
         .iter()
         .find(|o| o.name == *name)?

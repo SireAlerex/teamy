@@ -1,4 +1,4 @@
-use crate::consts;
+use crate::message;
 use crate::{InteractionMessage, InteractionResponse};
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
@@ -20,7 +20,7 @@ async fn bonjour(ctx: &Context, msg: &Message) -> CommandResult {
 fn salutation() -> String {
     format!(
         "{} !",
-        consts::SALUTATIONS
+        message::SALUTATIONS
             .iter()
             .choose(&mut thread_rng())
             .unwrap_or(&"Bonjour !")

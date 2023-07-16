@@ -1,11 +1,11 @@
-pub mod command;
+pub mod command_info;
 mod commands;
-pub mod consts;
 #[allow(clippy::impl_trait_in_params)]
 pub mod db;
 pub mod interaction;
 mod loops;
 mod message;
+mod secrets;
 pub mod utils;
 pub mod web_scraper;
 
@@ -30,9 +30,10 @@ use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::Mutex;
 use tracing::{error, info};
 
-use command::{CommandGroupInfo, CommandGroups, CommandGroupsContainer, CommandInfo};
+use command_info::{CommandGroupInfo, CommandGroups, CommandGroupsContainer, CommandInfo};
 use commands::general;
 use commands::general::GENERAL_GROUP;
 use commands::macros;
@@ -44,39 +45,35 @@ use interaction::{InteractionMessage, InteractionResponse};
 struct ShardManagerContainer;
 
 impl TypeMapKey for ShardManagerContainer {
-    type Value = Arc<tokio::sync::Mutex<ShardManager>>;
+    type Value = Arc<Mutex<ShardManager>>;
 }
 
-struct GuildGroup {
-    guilds: Vec<GuildId>,
-}
+struct GuildGroup(Vec<GuildId>);
 
 struct GuildIdContainer;
 
 impl TypeMapKey for GuildIdContainer {
-    type Value = Arc<tokio::sync::Mutex<GuildGroup>>;
+    type Value = Arc<GuildGroup>;
 }
 
 struct LogChanIdContainer;
 
 impl TypeMapKey for LogChanIdContainer {
-    type Value = Arc<tokio::sync::Mutex<ChannelId>>;
+    type Value = Arc<ChannelId>;
 }
 
-struct DatabaseUri {
-    db_uri: String,
-}
+struct DatabaseUri(String);
 
 struct DatabaseUriContainer;
 
 impl TypeMapKey for DatabaseUriContainer {
-    type Value = Arc<tokio::sync::Mutex<DatabaseUri>>;
+    type Value = Arc<DatabaseUri>;
 }
 
 struct TempChanContainer;
 
 impl TypeMapKey for TempChanContainer {
-    type Value = Arc<tokio::sync::Mutex<ChannelId>>;
+    type Value = Arc<ChannelId>;
 }
 
 struct Bot {
@@ -139,17 +136,13 @@ impl EventHandler for Bot {
         }
 
         let data = ctx_arc.data.read().await;
-        let guild_group = if let Some(guild_group) = data.get::<GuildIdContainer>() {
-            guild_group
-        } else {
+        let Some(guild_group) = data.get::<GuildIdContainer>() else {
             error!("There was a problem getting the guild id");
             return;
-        }
-        .lock()
-        .await;
+        };
 
         let mut results: Vec<(GuildId, Result<Vec<Command>, serenity::Error>)> = Vec::new();
-        for guild in &guild_group.guilds {
+        for guild in &guild_group.0 {
             results.push((
                 *guild,
                 guild
@@ -236,7 +229,7 @@ impl EventHandler for Bot {
             }
             Interaction::ModalSubmit(modal) => {
                 let res = match modal.data.custom_id.as_str() {
-                    consts::MACRO_ADD_FORM_ID => macros::add::run_message(&ctx, &modal).await,
+                    interaction::MACRO_ADD_FORM_ID => macros::add::run_message(&ctx, &modal).await,
                     _ => {
                         InteractionResponse::Message(InteractionMessage::ephemeral("modal inconnu"))
                     }
@@ -289,15 +282,12 @@ async fn after(ctx: &Context, msg: &Message, command_name: &str, command_result:
     }
 }
 
-#[allow(clippy::expect_used, clippy::panic)]
 #[shuttle_runtime::main]
 async fn serenity(
     #[shuttle_secrets::Secrets] secret_store: SecretStore,
 ) -> shuttle_serenity::ShuttleSerenity {
     // Get the discord token set in Secrets.toml
-    let Some(token) = secret_store.get("DISCORD_TOKEN") else {
-        return Err(anyhow!("'DISCORD_TOKEN' was not found").into());
-    };
+    let token = secrets::get(&secret_store, "DISCORD_TOKEN")?;
     let http = Http::new(&token);
 
     let (owners, _bot_id) = match http.get_current_application_info().await {
@@ -307,7 +297,7 @@ async fn serenity(
 
             (owners, info.id)
         }
-        Err(why) => panic!("Could not access application info: {why:?}"),
+        Err(why) => return Err(anyhow!("Could not access application info: {why:?}").into()),
     };
 
     let framework = StandardFramework::new()
@@ -356,41 +346,22 @@ async fn serenity(
         .await
         .expect("Error creating client");
 
-    let guilds: Vec<GuildId> = if let Some(ids) = secret_store.get("GUILD_ID") {
-        ids.split(',')
-            .map(|id_str| GuildId(id_str.parse().expect("guild id should be u64")))
-            .collect()
-    } else {
-        return Err(anyhow!("'GUILD_ID' was not found").into());
-    };
-
-    let guild_group = GuildGroup { guilds };
-
-    let Some(log_chan_id) = secret_store.get("LOG_CHAN_ID") else {
-        return Err(anyhow!("'LOG_CHAN_ID' was not found").into());
-    };
-    let log_chan = Arc::new(tokio::sync::Mutex::new(ChannelId(
-        log_chan_id.parse().expect("LOG_CHAN_ID should be u64"),
-    )));
-
-    let Some(uri) = secret_store.get("DATABASE_URI") else {
-        return Err(anyhow!("'DATABASE_URI' was not found").into());
-    };
-    let db_uri = Arc::new(tokio::sync::Mutex::new(DatabaseUri { db_uri: uri }));
-
-    let Some(temp_chan_id) = secret_store.get("TEMP_CHAN") else {
-        return Err(anyhow!("'TEMP_CHAN' was not found").into());
-    };
-    let temp_chan = ChannelId(temp_chan_id.parse().expect("TEMP_CHAN should be u64"));
+    let guild_group = GuildGroup(secrets::parse_objects::<u64, GuildId>(
+        &secret_store,
+        "GUILD_ID",
+    )?);
+    let log_chan = ChannelId(secrets::parse(&secret_store, "LOG_CHAN_ID")?);
+    let db_uri = DatabaseUri(secrets::get(&secret_store, "DATABASE_URI")?);
+    let temp_chan = ChannelId(secrets::parse(&secret_store, "TEMP_CHAN")?);
 
     {
         let mut data = client.data.write().await;
         data.insert::<ShardManagerContainer>(Arc::clone(&client.shard_manager));
-        data.insert::<GuildIdContainer>(Arc::new(tokio::sync::Mutex::new(guild_group)));
-        data.insert::<LogChanIdContainer>(Arc::clone(&log_chan));
-        data.insert::<CommandGroupsContainer>(Arc::new(tokio::sync::Mutex::new(groups)));
-        data.insert::<DatabaseUriContainer>(Arc::clone(&db_uri));
-        data.insert::<TempChanContainer>(Arc::new(tokio::sync::Mutex::new(temp_chan)));
+        data.insert::<GuildIdContainer>(Arc::new(guild_group));
+        data.insert::<LogChanIdContainer>(Arc::new(log_chan));
+        data.insert::<CommandGroupsContainer>(Arc::new(groups));
+        data.insert::<DatabaseUriContainer>(Arc::new(db_uri));
+        data.insert::<TempChanContainer>(Arc::new(temp_chan));
     }
 
     Ok(client.into())

@@ -308,26 +308,23 @@ impl Display for RollResult<'_> {
 #[example = "2d20dh1"]
 #[example = "2d20kl1"]
 pub async fn roll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    let _ = roll_intern(ctx, msg.channel_id, args).await?;
+    let _ = roll_intern(ctx, &msg.channel_id, args).await?;
     Ok(())
 }
 
 pub async fn roll_intern(
     ctx: &Context,
-    channel_id: ChannelId,
+    channel_id: &ChannelId,
     args: Args,
 ) -> Result<Message, CommandError> {
-    let msg = channel_id
+    channel_id
         .say(&ctx.http, Roll::from_str(args.message())?.roll()?)
-        .await?;
-
-    Ok(msg)
+        .await
+        .map_err(|e| utils::command_error(e.to_string()))
 }
 
 fn sum(rolls: &[u64], modifier: i64) -> Result<i64, std::num::TryFromIntError> {
     Ok(modifier + <u64 as TryInto<i64>>::try_into(rolls.iter().sum::<u64>())?)
-    // let x: StdResult<i64, std::num::TryFromIntError> = <u64 as TryInto<i64>>::try_into(rolls.iter().sum::<u64>());
-    // modifier
 }
 
 fn show_res(roll: &str, res: String, number: u64, modifier: i64) -> String {

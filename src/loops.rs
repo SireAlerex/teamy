@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tracing::error;
 
 use crate::utils;
-use crate::{consts, LogChanIdContainer};
+use crate::LogChanIdContainer;
 
 pub async fn log_system_load(ctx: Arc<Context>) {
     let time = Local::now().to_rfc2822();
@@ -33,14 +33,10 @@ pub async fn log_system_load(ctx: Arc<Context>) {
     };
 
     let data = ctx.data.read().await;
-    let log_chan_id = if let Some(id) = data.get::<LogChanIdContainer>() {
-        id
-    } else {
+    let Some(log_chan_id) = data.get::<LogChanIdContainer>() else {
         error!("There was a problem getting the log chan id");
         return;
-    }
-    .lock()
-    .await;
+    };
 
     let message = log_chan_id
         .send_message(&ctx, |m| {
@@ -59,9 +55,18 @@ pub async fn log_system_load(ctx: Arc<Context>) {
 }
 
 pub fn status_loop(ctx: &Arc<Context>) {
-    let game = *consts::GAME_POOL
-        .iter()
-        .choose(&mut thread_rng())
-        .unwrap_or(&"no game :(");
+    let game = &[
+        "LoL avec les boys",
+        "Deep Rock Galactic avec les boys",
+        "Pathfinder avec les boys",
+        "Minecraft avec les boys",
+        "Civ6 avec les boys",
+        "être raciste",
+        "manger son caca",
+        "[STRENG GEHEIM]",
+    ]
+    .iter()
+    .choose(&mut thread_rng())
+    .unwrap_or(&"no game :(");
     ctx.shard.set_activity(Some(Activity::playing(game)));
 }
