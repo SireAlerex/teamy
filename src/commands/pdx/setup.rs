@@ -8,19 +8,17 @@ use serenity::{
 };
 
 use super::{dd, show};
-use crate::interaction::{InteractionMessage, InteractionResponse};
+use crate::interaction::{InteractionMessage, Response};
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
     if let Some(first) = command.data.options.first() {
         match first.name.as_str() {
             "dd" => dd::run(ctx, command).await,
             "show" => show::run(ctx, command).await,
-            _ => InteractionResponse::Message(InteractionMessage::with_content(
-                "pdx run unknown name",
-            )),
+            _ => Response::Message(InteractionMessage::with_content("pdx run unknown name")),
         }
     } else {
-        InteractionResponse::Message(InteractionMessage::ephemeral("pdx run no option"))
+        Response::Message(InteractionMessage::ephemeral("pdx run no option"))
     }
 }
 

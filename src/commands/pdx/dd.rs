@@ -1,5 +1,5 @@
 use super::model::{PdxGame, PdxLinks};
-use crate::interaction::InteractionResponse;
+use crate::interaction::Response;
 use crate::{db, utils, web_scraper};
 use serenity::framework::standard::CommandError;
 use serenity::framework::standard::{macros::command, Args, CommandResult};
@@ -67,6 +67,6 @@ async fn update_links(
     }
 }
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
     show::show_interaction(ctx, command, run_intern(ctx).await).await
 }

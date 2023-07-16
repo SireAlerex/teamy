@@ -3,13 +3,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serenity::model::application::command::Command;
-use serenity::model::application::interaction::Interaction;
+use serenity::model::application::interaction::Interaction as SerenityInteraction;
 use serenity::model::prelude::command::CommandType;
 use serenity::model::prelude::*;
 use serenity::{async_trait, prelude::*};
 use tracing::{error, info};
+use SerenityInteraction::{ApplicationCommand, Autocomplete, MessageComponent, ModalSubmit, Ping};
 
-use crate::interaction::{InteractionMessage, InteractionResponse};
+use crate::interaction::{Interaction, InteractionMessage, Response};
 use crate::{commands, interaction, loops, GuildIdContainer};
 use commands::{general, macros, pdx};
 
@@ -98,71 +99,62 @@ impl EventHandler for Bot {
         }
     }
 
-    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        match interaction {
-            Interaction::ApplicationCommand(command) => {
-                let result: InteractionResponse =
-                    match command.data.kind {
-                        CommandType::ChatInput => match command.data.name.as_str() {
-                            "help" => general::help::run(&ctx, &command).await,
-                            "bonjour" => general::bonjour::run(),
-                            "slide" => general::slide::run(&ctx, &command).await,
-                            "ping" => general::ping::run(&ctx).await,
-                            "nerd" => general::nerd::run_chat_input(&command.data.options),
-                            "id" => general::id::run_chat_input(&command.data.options),
-                            "roll" => general::roll::run_chat_input(&command.data.options),
-                            "basé" => general::based::run_chat_input(&command.data.options),
-                            "tg" => general::tg::run(&ctx, &command).await,
-                            "macro" => macros::setup::run(&ctx, &command).await,
-                            "pdx" => pdx::setup::run(&ctx, &command).await,
-                            _ => InteractionResponse::Message(InteractionMessage::ephemeral(
-                                format!("Unkown command ChatInput : {}", command.data.name),
-                            )),
-                        },
-                        CommandType::Message => match command.data.name.as_str() {
-                            "nerd" => general::nerd::run_message(&ctx, &command).await,
-                            "basé" => general::based::run_message(&ctx, &command).await,
-                            "macro add" => macros::add::run_message_form(&ctx, &command).await,
-                            _ => InteractionResponse::Message(InteractionMessage::ephemeral(
-                                format!("Unkown command Message : {}", command.data.name),
-                            )),
-                        },
-                        CommandType::User => match command.data.name.as_str() {
-                            "id" => general::id::run_user(&ctx, &command).await,
-                            _ => InteractionResponse::Message(InteractionMessage::ephemeral(
-                                format!("Unkown command User : {}", command.data.name),
-                            )),
-                        },
-                        CommandType::Unknown => InteractionResponse::Message(
-                            InteractionMessage::ephemeral("Unkown data kind"),
-                        ),
-                        _ => InteractionResponse::Message(InteractionMessage::ephemeral(
-                            "wildcard data kind",
-                        )),
-                    };
-
-                match result {
-                    InteractionResponse::Message(interaction_message) => {
-                        interaction_message.send_from_command(&ctx, &command).await;
+    async fn interaction_create(&self, ctx: Context, interaction: SerenityInteraction) {
+        let result = match interaction {
+            ApplicationCommand(command) => {
+                let name = command.data.name.as_str();
+                let response = match command.data.kind {
+                    CommandType::ChatInput => match name {
+                        "help" => general::help::run(&ctx, &command).await,
+                        "bonjour" => general::bonjour::run(),
+                        "slide" => general::slide::run(&ctx, &command).await,
+                        "ping" => general::ping::run(&ctx).await,
+                        "nerd" => general::nerd::run_chat_input(&command.data.options),
+                        "id" => general::id::run_chat_input(&command.data.options),
+                        "roll" => general::roll::run_chat_input(&command.data.options),
+                        "basé" => general::based::run_chat_input(&command.data.options),
+                        "tg" => general::tg::run(&ctx, &command).await,
+                        "macro" => macros::setup::run(&ctx, &command).await,
+                        "pdx" => pdx::setup::run(&ctx, &command).await,
+                        _ => Response::Message(InteractionMessage::ephemeral(format!(
+                            "Unkown command ChatInput : {name}"
+                        ))),
+                    },
+                    CommandType::Message => match name {
+                        "nerd" => general::nerd::run_message(&ctx, &command).await,
+                        "basé" => general::based::run_message(&ctx, &command).await,
+                        "macro add" => macros::add::run_message_form(&ctx, &command).await,
+                        _ => Response::Message(InteractionMessage::ephemeral(format!(
+                            "Unkown command Message : {}",
+                            command.data.name
+                        ))),
+                    },
+                    CommandType::User => match name {
+                        "id" => general::id::run_user(&ctx, &command).await,
+                        _ => Response::Message(InteractionMessage::ephemeral(format!(
+                            "Unkown command User : {}",
+                            command.data.name
+                        ))),
+                    },
+                    CommandType::Unknown => {
+                        Response::Message(InteractionMessage::ephemeral("Unkown data kind"))
                     }
-                    InteractionResponse::Modal => todo!(),
-                    InteractionResponse::None => (),
-                }
-            }
-            Interaction::ModalSubmit(modal) => {
-                let res = match modal.data.custom_id.as_str() {
-                    interaction::MACRO_ADD_FORM_ID => macros::add::run_message(&ctx, &modal).await,
-                    _ => {
-                        InteractionResponse::Message(InteractionMessage::ephemeral("modal inconnu"))
-                    }
+                    _ => Response::Message(InteractionMessage::ephemeral("wildcard data kind")),
                 };
-                if let InteractionResponse::Message(m) = res {
-                    m.send_from_modal(&ctx, &modal).await;
-                }
+                Interaction::new(response, ApplicationCommand(command))
             }
-            Interaction::Ping(_)
-            | Interaction::Autocomplete(_)
-            | Interaction::MessageComponent(_) => (),
-        }
+            ModalSubmit(modal) => {
+                let response = match modal.data.custom_id.as_str() {
+                    interaction::MACRO_ADD_FORM_ID => macros::add::run_message(&ctx, &modal).await,
+                    _ => Response::Message(InteractionMessage::ephemeral("modal inconnu")),
+                };
+                Interaction::new(response, ModalSubmit(modal))
+            }
+            Ping(ping) => Interaction::new(Response::None, Ping(ping)),
+            Autocomplete(auto) => Interaction::new(Response::None, Autocomplete(auto)),
+            MessageComponent(msg) => Interaction::new(Response::None, MessageComponent(msg)),
+        };
+
+        result.send(&ctx).await;
     }
 }

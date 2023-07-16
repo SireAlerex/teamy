@@ -1,5 +1,5 @@
 use crate::message;
-use crate::{InteractionMessage, InteractionResponse};
+use crate::{InteractionMessage, Response};
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use serenity::builder::CreateApplicationCommand;
@@ -27,8 +27,8 @@ fn salutation() -> String {
     )
 }
 
-pub fn run() -> InteractionResponse {
-    InteractionResponse::Message(InteractionMessage::with_content(salutation()))
+pub fn run() -> Response {
+    Response::Message(InteractionMessage::with_content(salutation()))
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

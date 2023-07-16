@@ -7,7 +7,7 @@ use serenity::{
 };
 
 use crate::{db, utils};
-use crate::{InteractionMessage, InteractionResponse};
+use crate::{InteractionMessage, Response};
 
 async fn toggle_mute<
     T: core::fmt::Debug
@@ -74,7 +74,7 @@ async fn mute_status(ctx: &Context, command: &ApplicationCommandInteraction) -> 
     )
 }
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
     let content = match command.data.options[0].name.as_str() {
         "moi" => {
             match toggle_mute(
@@ -141,7 +141,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         "status" => mute_status(ctx, command).await,
         _ => String::from("unexpected subcommand"),
     };
-    InteractionResponse::Message(InteractionMessage::ephemeral(content))
+    Response::Message(InteractionMessage::ephemeral(content))
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

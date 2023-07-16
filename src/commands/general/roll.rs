@@ -1,4 +1,4 @@
-use crate::{utils, InteractionMessage, InteractionResponse};
+use crate::{utils, InteractionMessage, Response};
 use itertools::Itertools;
 use rand::Rng;
 use serenity::builder::CreateApplicationCommand;
@@ -388,7 +388,7 @@ fn add_modifier(s: String, modifier: i64) -> String {
 }
 
 // TODO: refactor as wrapper with result<interaction, string> for error handling
-pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
+pub fn run_chat_input(options: &[CommandDataOption]) -> Response {
     let mut n = 1;
     let mut size = 0;
     let mut modifier = 0;
@@ -422,14 +422,14 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
         }
     }
     let Ok(n): Result<u64, _> = n.try_into() else {
-        return InteractionResponse::Message(InteractionMessage::ephemeral("erreur dice number conversion"));
+        return Response::Message(InteractionMessage::ephemeral("erreur dice number conversion"));
     };
     let Ok(size): Result<u64, _> = size.try_into() else {
-        return InteractionResponse::Message(InteractionMessage::ephemeral("erreur dice size conversion"));
+        return Response::Message(InteractionMessage::ephemeral("erreur dice size conversion"));
     };
 
     let Ok(dk) = DropKeep::from_str(&init_dk) else {
-        return InteractionResponse::Message(InteractionMessage::ephemeral("erre dk"));
+        return Response::Message(InteractionMessage::ephemeral("erre dk"));
     };
     let r = RollBuilder::new()
         .number(n)
@@ -442,7 +442,7 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
         Ok(roll) => roll.to_string(),
         Err(e) => e.to_string(),
     };
-    InteractionResponse::Message(InteractionMessage::with_content(content))
+    Response::Message(InteractionMessage::with_content(content))
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::utils;
-use crate::{InteractionMessage, InteractionResponse};
+use crate::{InteractionMessage, Response};
 use serenity::builder::CreateApplicationCommand;
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::CommandResult;
@@ -28,8 +28,8 @@ async fn latency(ctx: &Context) -> String {
     format!("Pong ! {res}")
 }
 
-pub async fn run(ctx: &Context) -> InteractionResponse {
-    InteractionResponse::Message(InteractionMessage::with_content(latency(ctx).await))
+pub async fn run(ctx: &Context) -> Response {
+    Response::Message(InteractionMessage::with_content(latency(ctx).await))
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

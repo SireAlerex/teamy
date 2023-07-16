@@ -9,7 +9,7 @@ use serenity::prelude::*;
 
 use super::model::{PdxFollow, PdxGame, PdxLinks};
 use crate::db;
-use crate::interaction::{InteractionMessage, InteractionResponse};
+use crate::interaction::{InteractionMessage, Response};
 use crate::utils;
 
 #[command]
@@ -79,7 +79,7 @@ pub async fn show_interaction(
     ctx: &Context,
     command: &ApplicationCommandInteraction,
     links_res: Result<PdxLinks, CommandError>,
-) -> InteractionResponse {
+) -> Response {
     match links_res {
         Ok(links) => {
             let (content, embed) = match embed(ctx, &command.user, &links).await {
@@ -87,14 +87,14 @@ pub async fn show_interaction(
                 Err(err) => (err.to_string(), None),
             };
 
-            InteractionResponse::Message(InteractionMessage::new(content, true, embed))
+            Response::Message(InteractionMessage::new(content, true, embed))
         }
-        Err(e) => InteractionResponse::Message(InteractionMessage::with_content(format!(
+        Err(e) => Response::Message(InteractionMessage::with_content(format!(
             "erreur pour accéder aux liens: {e}"
         ))),
     }
 }
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
     show_interaction(ctx, command, PdxLinks::db_links(ctx).await).await
 }

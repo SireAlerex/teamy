@@ -1,4 +1,4 @@
-use crate::{db, utils, InteractionMessage, InteractionResponse};
+use crate::{db, utils, InteractionMessage, Response};
 use bson::doc;
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::{Args, CommandResult};
@@ -27,10 +27,10 @@ async fn del_macros(ctx: &Context, user_id: String) -> Result<(), mongodb::error
     db::delete_multiple_query::<Macro>(ctx, "macros", query).await
 }
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
     let content = match del_macros(ctx, command.user.id.to_string()).await {
         Ok(_) => "Toutes vos macros ont bien été supprimées".to_string(),
         Err(e) => format!("Erreur lors de la suppression des macros : {e}"),
     };
-    InteractionResponse::Message(InteractionMessage::ephemeral(content))
+    Response::Message(InteractionMessage::ephemeral(content))
 }

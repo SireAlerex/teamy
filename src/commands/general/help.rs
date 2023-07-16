@@ -1,5 +1,5 @@
 use crate::command_info::{CommandGroups, CommandGroupsContainer};
-use crate::{utils, InteractionMessage, InteractionResponse};
+use crate::{utils, InteractionMessage, Response};
 use serenity::model::application::command::CommandOptionType;
 use serenity::{
     builder::{CreateApplicationCommand, CreateEmbed},
@@ -7,12 +7,12 @@ use serenity::{
     prelude::Context,
 };
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
     let data = ctx.data.read().await;
     let command_groups_container = data.get::<CommandGroupsContainer>();
 
     let Some(groups_container) =  command_groups_container else {
-        return InteractionResponse::Message(InteractionMessage::ephemeral(
+        return Response::Message(InteractionMessage::ephemeral(
             "Erreur pour accéder aux groupes de commandes",
         ));
     };
@@ -106,7 +106,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         .color(serenity::utils::Colour::PURPLE)
         .clone();
 
-    InteractionResponse::Message(InteractionMessage::new("", true, Some(embed)))
+    Response::Message(InteractionMessage::new("", true, Some(embed)))
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

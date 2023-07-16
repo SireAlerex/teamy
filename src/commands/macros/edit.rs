@@ -1,6 +1,6 @@
 use super::r#macro::Macro;
 use crate::commands::macros::r#macro;
-use crate::{db, utils, InteractionMessage, InteractionResponse};
+use crate::{db, utils, InteractionMessage, Response};
 use bson::doc;
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::{Args, CommandResult};
@@ -34,13 +34,13 @@ async fn edit_macro(ctx: &Context, user_id: String, name: String, args: String) 
     Ok(())
 }
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
     let subcommand = &command.data.options[0];
     let user_id = command.user.id.to_string();
     let name = match utils::option_as_str(subcommand, "nom") {
         Some(s) => s.to_owned(),
         None => {
-            return InteractionResponse::Message(InteractionMessage::ephemeral(
+            return Response::Message(InteractionMessage::ephemeral(
                 "erreur d'arguments : pas de 'nom'",
             ))
         }
@@ -48,7 +48,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
     let args = match utils::option_as_str(subcommand, "arguments") {
         Some(s) => s.to_owned(),
         None => {
-            return InteractionResponse::Message(InteractionMessage::ephemeral(
+            return Response::Message(InteractionMessage::ephemeral(
                 "erreur d'arguments : pas de 'arguments'",
             ))
         }
@@ -57,5 +57,5 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         Ok(_) => "La macro a bien été modifiée".to_string(),
         Err(e) => format!("Une erreur s'est produite lors de la modification : {e}"),
     };
-    InteractionResponse::Message(InteractionMessage::ephemeral(content))
+    Response::Message(InteractionMessage::ephemeral(content))
 }

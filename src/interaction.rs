@@ -1,8 +1,10 @@
 use serenity::builder::{CreateEmbed, CreateInteractionResponse};
+use serenity::model::application::interaction::Interaction as SerenityInteraction;
 use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
 use serenity::model::prelude::interaction::modal::ModalSubmitInteraction;
 use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::prelude::*;
+use SerenityInteraction::{ApplicationCommand, ModalSubmit};
 
 use crate::utils;
 
@@ -10,7 +12,32 @@ use crate::utils;
 pub const MACRO_ADD_FORM_ID: &str = "macro_add_form";
 pub const MACRO_ADD_FORM_NAME: &str = "macro_add_name";
 
-pub enum InteractionResponse {
+pub struct Interaction {
+    response: Response,
+    serenity_interaction: SerenityInteraction,
+}
+
+impl Interaction {
+    pub fn new(response: Response, serenity_interaction: SerenityInteraction) -> Self {
+        Self {
+            response,
+            serenity_interaction,
+        }
+    }
+
+    pub async fn send(self, ctx: &Context) {
+        match self.response {
+            Response::Message(msg) => match self.serenity_interaction {
+                ApplicationCommand(command) => msg.send_from_command(ctx, &command).await,
+                ModalSubmit(modal) => msg.send_from_modal(ctx, &modal).await,
+                _ => (),
+            },
+            _ => (),
+        }
+    }
+}
+
+pub enum Response {
     Message(InteractionMessage),
     Modal,
     None,

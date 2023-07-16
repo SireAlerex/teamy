@@ -1,6 +1,6 @@
 use super::r#macro::Macro;
 use crate::db;
-use crate::{InteractionMessage, InteractionResponse};
+use crate::{InteractionMessage, Response};
 use bson::doc;
 use serenity::builder::CreateEmbed;
 use serenity::framework::standard::macros::command;
@@ -52,7 +52,7 @@ async fn get_macros(ctx: &Context, user_id: UserId) -> Result<Vec<Macro>, mongod
     db::get_objects::<Macro>(ctx, "macros", filter).await
 }
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
     let (content, embed) = match macro_embed(ctx, &command.user).await {
         Ok(embed) => (String::new(), Some(embed)),
         Err(e) => (
@@ -60,5 +60,5 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
             None,
         ),
     };
-    InteractionResponse::Message(InteractionMessage::new(content, true, embed))
+    Response::Message(InteractionMessage::new(content, true, embed))
 }

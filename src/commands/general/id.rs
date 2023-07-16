@@ -1,4 +1,4 @@
-use crate::{InteractionMessage, InteractionResponse};
+use crate::{InteractionMessage, Response};
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::command::CommandOptionType;
@@ -32,10 +32,7 @@ pub async fn id(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
     Ok(())
 }
 
-pub async fn run_user(
-    ctx: &Context,
-    command: &ApplicationCommandInteraction,
-) -> InteractionResponse {
+pub async fn run_user(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
     let content = match command.data.target_id {
         Some(target_id) => match target_id.to_user_id().to_user(&ctx.http).await {
             Ok(user) => format!("L'id de {} est {target_id}", user.tag()),
@@ -43,10 +40,10 @@ pub async fn run_user(
         },
         None => String::from("Pas de TargetId dans l'interaction"),
     };
-    InteractionResponse::Message(InteractionMessage::with_content(content))
+    Response::Message(InteractionMessage::with_content(content))
 }
 
-pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
+pub fn run_chat_input(options: &[CommandDataOption]) -> Response {
     let content = if let Some(option) = options.get(0) {
         if let Some(value) = option.resolved.as_ref() {
             match value {
@@ -61,7 +58,7 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
     } else {
         "erreur : pas de 'CommandDataOption'".to_owned()
     };
-    InteractionResponse::Message(InteractionMessage::with_content(content))
+    Response::Message(InteractionMessage::with_content(content))
 }
 
 pub fn register_user(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

@@ -4,18 +4,16 @@ use serenity::model::prelude::interaction::application_command::ApplicationComma
 use serenity::prelude::Context;
 
 use super::{add, clear, del, edit, show};
-use crate::{InteractionMessage, InteractionResponse};
+use crate::{InteractionMessage, Response};
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
     match command.data.options[0].name.as_str() {
         "add" => add::run(ctx, command).await,
         "del" => del::run(ctx, command).await,
         "show" => show::run(ctx, command).await,
         "edit" => edit::run(ctx, command).await,
         "clear" => clear::run(ctx, command).await,
-        _ => {
-            InteractionResponse::Message(InteractionMessage::ephemeral("macro_unknown_subcommand"))
-        }
+        _ => Response::Message(InteractionMessage::ephemeral("macro_unknown_subcommand")),
     }
 }
 

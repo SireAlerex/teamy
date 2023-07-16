@@ -23,7 +23,7 @@ use tokio::sync::Mutex;
 
 use bot::Bot;
 use command_info::CommandGroupsContainer;
-use interaction::{InteractionMessage, InteractionResponse};
+use interaction::{InteractionMessage, Response};
 
 struct ShardManagerContainer;
 

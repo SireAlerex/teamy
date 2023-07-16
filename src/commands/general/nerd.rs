@@ -1,5 +1,5 @@
 use crate::utils;
-use crate::{InteractionMessage, InteractionResponse};
+use crate::{InteractionMessage, Response};
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::command::CommandOptionType;
@@ -25,17 +25,14 @@ pub fn run(text: &str) -> String {
     format!("\"{} :nerd:\"", utils::nerdify(text))
 }
 
-pub fn run_chat_input(options: &[CommandDataOption]) -> InteractionResponse {
+pub fn run_chat_input(options: &[CommandDataOption]) -> Response {
     let content =
         utils::command_option_str(options, "texte").map_or("erreur: pas de texte?".to_owned(), run);
 
-    InteractionResponse::Message(InteractionMessage::with_content(content))
+    Response::Message(InteractionMessage::with_content(content))
 }
 
-pub async fn run_message(
-    ctx: &Context,
-    command: &ApplicationCommandInteraction,
-) -> InteractionResponse {
+pub async fn run_message(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
     let content = match command.data.target_id {
         Some(target_id) => {
             let message_id = target_id.to_message_id();
@@ -46,7 +43,7 @@ pub async fn run_message(
         }
         None => String::from("Erreur pour accéder au MessageId de l'interaction"),
     };
-    InteractionResponse::Message(InteractionMessage::with_content(content))
+    Response::Message(InteractionMessage::with_content(content))
 }
 
 pub fn register_message(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

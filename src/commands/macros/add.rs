@@ -1,6 +1,6 @@
 use super::r#macro::{test_macro, Macro, TempMacro};
 use crate::{db, interaction, utils};
-use crate::{InteractionMessage, InteractionResponse};
+use crate::{InteractionMessage, Response};
 use bson::doc;
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::{Args, CommandError, CommandResult};
@@ -43,12 +43,12 @@ async fn add_macro(
     Ok(())
 }
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> InteractionResponse {
+pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
     let subcommand = &command.data.options[0];
     let name = match utils::option_as_str(subcommand, "nom") {
         Some(s) => s.to_owned(),
         None => {
-            return InteractionResponse::Message(InteractionMessage::ephemeral(
+            return Response::Message(InteractionMessage::ephemeral(
                 "erreur d'arguments : pas de 'nom'",
             ))
         }
@@ -56,7 +56,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
     let command_name = match utils::option_as_str(subcommand, "commande") {
         Some(s) => s.to_owned(),
         None => {
-            return InteractionResponse::Message(InteractionMessage::ephemeral(
+            return Response::Message(InteractionMessage::ephemeral(
                 "erreur d'arguments : pas de 'nom'",
             ))
         }
@@ -67,7 +67,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Inte
         Ok(_) => "La macro a bien été ajoutée".to_string(),
         Err(e) => format!("Erreur lors de l'ajout de macro : {e}"),
     };
-    InteractionResponse::Message(InteractionMessage::ephemeral(content))
+    Response::Message(InteractionMessage::ephemeral(content))
 }
 
 async fn add_temp_macro(
@@ -123,23 +123,20 @@ fn roll_args(s: &str) -> Result<String, CommandError> {
     }
 }
 
-pub async fn run_message_form(
-    ctx: &Context,
-    command: &ApplicationCommandInteraction,
-) -> InteractionResponse {
+pub async fn run_message_form(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
     // create temporary macro from message and send modal to get macro name
     let content = if let Some(msg) = &command.data.resolved.messages.values().next() {
         match add_temp_macro(ctx, msg, command).await {
             Ok(_) => {
                 modal(ctx, command).await;
-                return InteractionResponse::None;
+                return Response::None;
             }
             Err(e) => format!("erreur lors de la préparation de l'ajout de macro : {e}"),
         }
     } else {
         "pas de message".to_string()
     };
-    InteractionResponse::Message(InteractionMessage::ephemeral(content))
+    Response::Message(InteractionMessage::ephemeral(content))
 }
 
 async fn temp_cleanup(ctx: &Context, user_id: String) -> Result<(), mongodb::error::Error> {
@@ -165,12 +162,12 @@ async fn complete_macro(
     }
 }
 
-pub async fn run_message(ctx: &Context, modal: &ModalSubmitInteraction) -> InteractionResponse {
+pub async fn run_message(ctx: &Context, modal: &ModalSubmitInteraction) -> Response {
     // take name from modal and completes macro
     let component = match &modal.data.components.first() {
         Some(action_row) => action_row.components.first(),
         None => {
-            return InteractionResponse::Message(InteractionMessage::ephemeral(
+            return Response::Message(InteractionMessage::ephemeral(
                 "erreur : action row component",
             ))
         }
@@ -187,7 +184,7 @@ pub async fn run_message(ctx: &Context, modal: &ModalSubmitInteraction) -> Inter
     } else {
         "erreur modal component".to_string()
     };
-    InteractionResponse::Message(InteractionMessage::ephemeral(content))
+    Response::Message(InteractionMessage::ephemeral(content))
 }
 
 pub async fn modal(ctx: &Context, command: &ApplicationCommandInteraction) {
