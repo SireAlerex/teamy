@@ -29,7 +29,7 @@ async fn del_macros(ctx: &Context, user_id: String) -> Result<(), mongodb::error
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
     let content = match del_macros(ctx, command.user.id.to_string()).await {
-        Ok(_) => "Toutes vos macros ont bien été supprimées".to_string(),
+        Ok(_) => "Toutes vos macros ont bien été supprimées".to_owned(),
         Err(e) => format!("Erreur lors de la suppression des macros : {e}"),
     };
     Response::Message(InteractionMessage::ephemeral(content))

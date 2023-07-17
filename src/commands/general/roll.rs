@@ -107,7 +107,7 @@ impl Roll {
 
         let initial_roll = rolls_str(&rolls, self.modifier);
 
-        let (s, rolls) = if self.dk.is_some() {
+        let (s, new_rolls) = if self.dk.is_some() {
             let new_rolls = match self.dk {
                 DropKeep::DL(x) => drop_low(rolls, x),
                 DropKeep::KH(x) => drop_low(rolls, self.number - x),
@@ -126,7 +126,7 @@ impl Roll {
             (initial_roll, rolls)
         };
 
-        let Ok(res) = sum(&rolls, self.modifier) else {
+        let Ok(res) = sum(&new_rolls, self.modifier) else {
             return Err("modifieur conversion error");
         };
         let message = format!(
@@ -135,7 +135,7 @@ impl Roll {
         );
         Ok(RollResult {
             roll: self,
-            rolls,
+            rolls: new_rolls,
             message,
         })
     }
@@ -308,7 +308,7 @@ impl Display for RollResult<'_> {
 #[example = "2d20dh1"]
 #[example = "2d20kl1"]
 pub async fn roll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    let _ = roll_intern(ctx, &msg.channel_id, args).await?;
+    let _: Message = roll_intern(ctx, &msg.channel_id, args).await?;
     Ok(())
 }
 
@@ -389,8 +389,8 @@ fn add_modifier(s: String, modifier: i64) -> String {
 
 // TODO: refactor as wrapper with result<interaction, string> for error handling
 pub fn run_chat_input(options: &[CommandDataOption]) -> Response {
-    let mut n = 1;
-    let mut size = 0;
+    let mut raw_number = 1;
+    let mut raw_size = 0;
     let mut modifier = 0;
     let mut init_dk = String::new();
 
@@ -399,12 +399,12 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> Response {
             match arg.name.as_str() {
                 "number" => {
                     if let CommandDataOptionValue::Integer(x) = value {
-                        n = *x;
+                        raw_number = *x;
                     }
                 }
                 "size" => {
                     if let CommandDataOptionValue::Integer(x) = value {
-                        size = *x;
+                        raw_size = *x;
                     }
                 }
                 "modifier" => {
@@ -421,10 +421,10 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> Response {
             }
         }
     }
-    let Ok(n): Result<u64, _> = n.try_into() else {
+    let Ok(number): Result<u64, _> = raw_number.try_into() else {
         return Response::Message(InteractionMessage::ephemeral("erreur dice number conversion"));
     };
-    let Ok(size): Result<u64, _> = size.try_into() else {
+    let Ok(size): Result<u64, _> = raw_size.try_into() else {
         return Response::Message(InteractionMessage::ephemeral("erreur dice size conversion"));
     };
 
@@ -432,7 +432,7 @@ pub fn run_chat_input(options: &[CommandDataOption]) -> Response {
         return Response::Message(InteractionMessage::ephemeral("erre dk"));
     };
     let r = RollBuilder::new()
-        .number(n)
+        .number(number)
         .size(size)
         .modifier(modifier)
         .drop_keep(dk)
@@ -454,7 +454,7 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
                 .name("size")
                 .description("Taille des dés")
                 .kind(CommandOptionType::Integer)
-                .min_int_value(2)
+                .min_int_value(2_u64)
                 .required(true)
         })
         .create_option(|option| {
@@ -462,8 +462,8 @@ pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicatio
                 .name("number")
                 .description("Nombre de dés")
                 .kind(CommandOptionType::Integer)
-                .min_int_value(1)
-                .max_int_value(200)
+                .min_int_value(1_u64)
+                .max_int_value(200_u64)
         })
         .create_option(|option| {
             option

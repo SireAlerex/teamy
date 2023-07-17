@@ -32,7 +32,9 @@ async fn del_macro(
 }
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
-    let subcommand = &command.data.options[0];
+    let Some(subcommand) = &command.data.options.first() else {
+        return Response::Message(InteractionMessage::ephemeral("Erreur : pas de sous-commandes"));
+    };
     let name = match utils::option_as_str(subcommand, "nom") {
         Some(s) => s.to_owned(),
         None => {
@@ -42,7 +44,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Resp
         }
     };
     let content = match del_macro(ctx, command.user.id.to_string(), name).await {
-        Ok(_) => "La macro a bien été supprimée".to_string(),
+        Ok(_) => "La macro a bien été supprimée".to_owned(),
         Err(e) => format!("Erreur lors de la suppression de macro : {e}"),
     };
     Response::Message(InteractionMessage::ephemeral(content))

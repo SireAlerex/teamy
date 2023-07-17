@@ -50,7 +50,10 @@ impl TempMacro {
 }
 
 pub async fn handle_macro(ctx: &Context, msg: &Message) -> String {
-    let name = msg.content[1..].split(' ').next().unwrap_or("");
+    let Some(strip_content) = msg.content.strip_prefix('!') else {
+        return "Une macro doit contenir '!'".to_owned();
+    };
+    let name = strip_content.split(' ').next().unwrap_or("");
     let filter = doc! {"user_id": msg.author.id.to_string(), "name": name};
     if let Ok(res) = db::find_filter::<Macro>(ctx, "macros", filter).await {
         match res {
@@ -65,12 +68,12 @@ pub async fn handle_macro(ctx: &Context, msg: &Message) -> String {
                         "la commande roll attends des arguments".to_owned()
                     }
                 }
-                _ => "La commande n'est pas prise en charge".to_string(),
+                _ => "La commande n'est pas prise en charge".to_owned(),
             },
-            None => "La macro n'a pas été trouvée".to_string(),
+            None => "La macro n'a pas été trouvée".to_owned(),
         }
     } else {
-        "Problème avec la base de données".to_string()
+        "Problème avec la base de données".to_owned()
     }
 }
 
@@ -99,6 +102,6 @@ pub async fn test_macro(
         }
     };
     // error of deletion is unrelated to macro test so ignore it
-    let _ = msg.delete(&ctx.http).await;
+    let _msg = msg.delete(&ctx.http).await;
     Ok(())
 }

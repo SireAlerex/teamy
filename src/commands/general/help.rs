@@ -29,11 +29,11 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Resp
 
         if let Some(search_group) = groups.find_group(&arg) {
             if let Some(command) = search_group.find_command(&arg) {
-                title = command.names[0].to_owned();
+                title = command.names.first().unwrap_or(&"no name").to_string();
                 description = command
                     .desc
                     .unwrap_or("Erreur : pas de description")
-                    .to_string();
+                    .to_owned();
                 // usage field
                 if let Some(usage) = command.usage {
                     fields.push(("Usage", format!("`{title} {usage}`"), true));
@@ -57,8 +57,9 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Resp
                 if command.names.len() > 1 {
                     fields.push((
                         "Aliases",
-                        command.names[1..]
+                        command.names
                             .iter()
+                            .skip(1)
                             .map(|s| format!("`{s}`"))
                             .collect::<Vec<String>>()
                             .join(","),
@@ -71,7 +72,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Resp
             description = String::from("Erreur");
             fields.push((
                 "Erreur",
-                "La commande n'a pas pu être trouvée".to_string(),
+                "La commande n'a pas pu être trouvée".to_owned(),
                 false,
             ));
         }
@@ -93,8 +94,8 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Resp
                 .map(|p| format!("`{p}`"))
                 .collect::<Vec<String>>()
                 .join(", ");
-            let command_names = command_names.join("\n");
-            let value = format!("Préfixe(s) : {prefixes}\n{command_names}");
+            let names = command_names.join("\n");
+            let value = format!("Préfixe(s) : {prefixes}\n{names}");
             fields.push((name, value, true));
         }
     }

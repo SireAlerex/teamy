@@ -7,14 +7,18 @@ use super::{add, clear, del, edit, show};
 use crate::{InteractionMessage, Response};
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
-    match command.data.options[0].name.as_str() {
-        "add" => add::run(ctx, command).await,
-        "del" => del::run(ctx, command).await,
-        "show" => show::run(ctx, command).await,
-        "edit" => edit::run(ctx, command).await,
-        "clear" => clear::run(ctx, command).await,
-        _ => Response::Message(InteractionMessage::ephemeral("macro_unknown_subcommand")),
-    }
+    if let Some(option) =  command.data.options.first() {
+        match option.name.as_str() {
+            "add" => add::run(ctx, command).await,
+            "del" => del::run(ctx, command).await,
+            "show" => show::run(ctx, command).await,
+            "edit" => edit::run(ctx, command).await,
+            "clear" => clear::run(ctx, command).await,
+            _ => Response::Message(InteractionMessage::ephemeral("macro_unknown_subcommand")),
+        }
+    } else {
+        Response::Message(InteractionMessage::ephemeral("macro no options"))
+    }    
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

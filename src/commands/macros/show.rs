@@ -14,7 +14,7 @@ use serenity::prelude::Context;
 #[description = "affiche les macros de l'utilisateur"]
 async fn show(ctx: &Context, msg: &Message, _args: Args) -> CommandResult {
     let embed = macro_embed(ctx, &msg.author).await?;
-    let _ = msg
+    let _: Message = msg
         .channel_id
         .send_message(&ctx.http, |m| m.set_embed(embed))
         .await?;

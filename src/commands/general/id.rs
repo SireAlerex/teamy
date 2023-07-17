@@ -28,7 +28,7 @@ pub async fn id(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
         Ok(user) => format!("L'id de {} est {}", user.clone().tag(), user.id),
         Err(e) => format!("L'utilisateur n'a pas pu être trouvé : {e}"),
     };
-    let _ = msg.channel_id.say(&ctx.http, text).await?;
+    let _: Message = msg.channel_id.say(&ctx.http, text).await?;
     Ok(())
 }
 

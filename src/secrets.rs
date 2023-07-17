@@ -14,7 +14,7 @@ pub fn parse<T: FromStr>(secret_store: &SecretStore, key: &str) -> Result<T, Err
     match secret_store.get(key) {
         Some(s) => s
             .parse::<T>()
-            .map_err(|_| anyhow!("'{key}' should be u64").into()),
+            .map_err(|_err| anyhow!("'{key}' should be u64").into()),
         None => Err(anyhow!("'{key}' was not found").into()),
     }
 }
@@ -28,7 +28,7 @@ pub fn parse_objects<T: FromStr, F: From<T>>(
             .split(',')
             .map(str::parse::<T>)
             .map(|x| {
-                x.map_err(|_| anyhow!("'{key}' should be {}", std::any::type_name::<T>()).into())
+                x.map_err(|_err| anyhow!("'{key}' should be {}", std::any::type_name::<T>()).into())
                     .map(F::from)
             })
             .collect(),

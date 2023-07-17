@@ -15,8 +15,8 @@ use serenity::prelude::Context;
 async fn edit(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let user_id = msg.author.id.to_string();
     let name = args.single::<String>()?;
-    let args = args.single::<String>()?;
-    edit_macro(ctx, user_id, name, args).await?;
+    let macro_args = args.single::<String>()?;
+    edit_macro(ctx, user_id, name, macro_args).await?;
 
     utils::say_or_error(ctx, msg.channel_id, "La macro a bien été modifiée").await;
     Ok(())
@@ -35,7 +35,9 @@ async fn edit_macro(ctx: &Context, user_id: String, name: String, args: String) 
 }
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
-    let subcommand = &command.data.options[0];
+    let Some(subcommand) = &command.data.options.first() else {
+        return Response::Message(InteractionMessage::ephemeral("Erreur : pas de sous-commandes"))
+    };
     let user_id = command.user.id.to_string();
     let name = match utils::option_as_str(subcommand, "nom") {
         Some(s) => s.to_owned(),
@@ -54,7 +56,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Resp
         }
     };
     let content = match edit_macro(ctx, user_id, name, args).await {
-        Ok(_) => "La macro a bien été modifiée".to_string(),
+        Ok(_) => "La macro a bien été modifiée".to_owned(),
         Err(e) => format!("Une erreur s'est produite lors de la modification : {e}"),
     };
     Response::Message(InteractionMessage::ephemeral(content))

@@ -21,7 +21,7 @@ async fn latency(ctx: &Context) -> String {
     let res = match utils::RunnerInfo::info(Arc::new(ctx.clone())).await {
         Ok(runnner) => match runnner.latency {
             Some(ping) => format!("``{ping:#?}``"),
-            None => "(il y a un problème pour accéder à la latence du bot, veuillez réessayer dans 1min)".to_string()
+            None => "(il y a un problème pour accéder à la latence du bot, veuillez réessayer dans 1min)".to_owned()
         },
         Err(e) => format!("(une erreur s'est produite : {e}")
     };

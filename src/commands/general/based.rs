@@ -15,7 +15,7 @@ use serenity::{
 #[description = "Détermine si quelque chose est basé"]
 #[usage = "<texte>"]
 pub async fn basé(ctx: &Context, msg: &Message) -> CommandResult {
-    let _ = msg.channel_id.say(&ctx.http, based()).await?;
+    let _: Message = msg.channel_id.say(&ctx.http, based()).await?;
     Ok(())
 }
 

@@ -75,7 +75,10 @@ async fn mute_status(ctx: &Context, command: &ApplicationCommandInteraction) -> 
 }
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
-    let content = match command.data.options[0].name.as_str() {
+    let Some(subcommand) = command.data.options.first() else {
+        return Response::Message(InteractionMessage::ephemeral("Erreur : pas de sous-commandes"))
+    };
+    let content = match subcommand.name.as_str() {
         "moi" => {
             match toggle_mute(
                 ctx,

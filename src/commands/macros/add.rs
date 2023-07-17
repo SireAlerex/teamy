@@ -1,7 +1,7 @@
 use super::r#macro::{test_macro, Macro, TempMacro};
 use crate::{db, interaction, utils};
 use crate::{InteractionMessage, Response};
-use bson::doc;
+use bson::{doc, Bson};
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::{Args, CommandError, CommandResult};
 use serenity::model::prelude::component::{ActionRowComponent, InputTextStyle};
@@ -20,12 +20,12 @@ async fn add(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let user_id = msg.author.id;
     let name = args.single::<String>()?;
     let command = args.single::<String>()?;
-    let args = if args.len() == 3 {
+    let macro_args = if args.len() == 3 {
         Some(args.single::<String>()?)
     } else {
         None
     };
-    add_macro(ctx, user_id.to_string(), name, command, args).await?;
+    add_macro(ctx, user_id.to_string(), name, command, macro_args).await?;
 
     utils::say_or_error(ctx, msg.channel_id, "La macro a bien été ajoutée").await;
     Ok(())
@@ -44,7 +44,9 @@ async fn add_macro(
 }
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
-    let subcommand = &command.data.options[0];
+    let Some(subcommand) = &command.data.options.first() else {
+        return Response::Message(InteractionMessage::ephemeral("Erreur : pas de sous-commandes"))
+    };
     let name = match utils::option_as_str(subcommand, "nom") {
         Some(s) => s.to_owned(),
         None => {
@@ -64,7 +66,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Resp
     let args = utils::option_as_str(subcommand, "arguments").map(std::borrow::ToOwned::to_owned);
     let content = match add_macro(ctx, command.user.id.to_string(), name, command_name, args).await
     {
-        Ok(_) => "La macro a bien été ajoutée".to_string(),
+        Ok(_) => "La macro a bien été ajoutée".to_owned(),
         Err(e) => format!("Erreur lors de l'ajout de macro : {e}"),
     };
     Response::Message(InteractionMessage::ephemeral(content))
@@ -85,10 +87,9 @@ async fn add_temp_macro(
             // find macro in db
             let filter =
                 doc! {"user_id": msg.author.id.to_string(), "name": msg.content.strip_prefix('!')};
-            let macr = db::find_filter::<Macro>(ctx, "macros", filter).await?;
-            if let Some(macr) = macr {
+            if let Some(macr) = db::find_filter::<Macro>(ctx, "macros", filter).await? {
                 let temp_macro = TempMacro::builder(user_id, macr.command, macr.args);
-                let _ = db::insert(ctx, "temp_macros", &temp_macro).await?;
+                let _: Bson = db::insert(ctx, "temp_macros", &temp_macro).await?;
                 Ok(())
             } else {
                 Err(utils::command_error("macro non trouvée"))
@@ -101,8 +102,8 @@ async fn add_temp_macro(
             if msg.content.starts_with("`[r") {
                 // roll macro
                 let args = roll_args(&msg.content)?;
-                let temp_macro = TempMacro::builder(user_id, "roll".to_string(), Some(args));
-                let _ = db::insert(ctx, "temp_macros", &temp_macro).await?;
+                let temp_macro = TempMacro::builder(user_id, "roll".to_owned(), Some(args));
+                let _: Bson = db::insert(ctx, "temp_macros", &temp_macro).await?;
                 Ok(())
             } else {
                 // non roll macros will need to be dealt with here
@@ -118,7 +119,7 @@ fn roll_args(s: &str) -> Result<String, CommandError> {
         return Err(utils::command_error("erreur captures regex"));
     };
     match caps.name("args") {
-        Some(m) => Ok(m.as_str().to_string()),
+        Some(m) => Ok(m.as_str().to_owned()),
         None => Err(utils::command_error("pas d'arguments")),
     }
 }
@@ -134,7 +135,7 @@ pub async fn run_message_form(ctx: &Context, command: &ApplicationCommandInterac
             Err(e) => format!("erreur lors de la préparation de l'ajout de macro : {e}"),
         }
     } else {
-        "pas de message".to_string()
+        "pas de message".to_owned()
     };
     Response::Message(InteractionMessage::ephemeral(content))
 }
@@ -155,7 +156,7 @@ async fn complete_macro(
         Some(temp) => {
             let macr = Macro::builder(temp.user_id, name, temp.command, temp.args);
             temp_cleanup(ctx, user_id).await?;
-            let _ = db::insert::<Macro>(ctx, "macros", &macr).await?;
+            let _: Bson = db::insert::<Macro>(ctx, "macros", &macr).await?;
             Ok(())
         }
         None => Err(db::mongodb_error("macro temporaire non trouvée")),
@@ -175,14 +176,14 @@ pub async fn run_message(ctx: &Context, modal: &ModalSubmitInteraction) -> Respo
     let content = if let Some(ActionRowComponent::InputText(input)) = component {
         if input.custom_id == interaction::MACRO_ADD_FORM_NAME {
             match complete_macro(ctx, modal.user.id.to_string(), input.value.clone()).await {
-                Ok(_) => "La macro a bien été ajouté".to_string(),
+                Ok(_) => "La macro a bien été ajouté".to_owned(),
                 Err(e) => format!("erreur lors de la complétion de la macro : {e}"),
             }
         } else {
-            "erreur modal id".to_string()
+            "erreur modal id".to_owned()
         }
     } else {
-        "erreur modal component".to_string()
+        "erreur modal component".to_owned()
     };
     Response::Message(InteractionMessage::ephemeral(content))
 }
