@@ -40,13 +40,20 @@ impl From<ReactionConversionError> for HandleMessageError {
     }
 }
 
-fn full_word(string: &str, targets: &[&str]) -> i32 {
+fn substring_count(string: &str, targets: &[&str]) -> usize {
     targets
         .iter()
         .filter(|t| string.contains(&t.to_lowercase()))
         .count()
-        .try_into()
-        .unwrap_or(i32::MAX)
+}
+
+fn fullword_count(string: &str, targets: &[&str]) -> usize {
+    let lowercase_targets: Vec<String> = targets.iter().map(|s| s.to_lowercase()).collect();
+    let compare: Vec<&str> = lowercase_targets.iter().map(std::string::String::as_str).collect();
+    string
+        .split_whitespace()
+        .filter(|word| compare.contains(word))
+        .count()
 }
 
 fn endwith(string: &str, targets: &[&str]) -> bool {
@@ -59,7 +66,11 @@ fn endwith(string: &str, targets: &[&str]) -> bool {
 }
 
 fn present(string: &str, targets: &[&str]) -> bool {
-    full_word(string, targets) > 0_i32
+    fullword_count(string, targets) > 0_usize
+}
+
+fn present_words(string: &str, targets: &[&str]) -> bool {
+    substring_count(string, targets) > 0_usize
 }
 
 fn _capitalize(s: &str) -> String {
@@ -151,10 +162,11 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, Han
     } else {
         user.name
     };
+    let bot = bot(&user_message);
 
     // emoji reactions
     // pirate
-    if present(&user_message, &["belle bite"]) {
+    if present_words(&user_message, &["belle bite"]) {
         let pirate = ReactionType::try_from("🏴‍☠️")?;
         let crossed_swords = ReactionType::try_from("⚔️")?;
         let _: Reaction = msg.react(&ctx.http, pirate).await?;
@@ -168,7 +180,7 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, Han
 
     // string reactions
     // bonjour bot
-    if bot(&user_message) && present(&user_message, &SALUTATIONS) {
+    if bot && present(&user_message, &SALUTATIONS) {
         return Ok(format!("{} {} !", choose(&SALUTATIONS), user_nick));
     }
 
@@ -190,7 +202,7 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, Han
         && present(&user_message, &["civ"])
         && present(&user_message, &["Thomas"])
     {
-        return Ok(emoji_or(ctx, msg.guild_id, "nerd").await);
+        return Ok(emoji_or(ctx, msg.guild_id, "bedge").await);
     }
 
     // cum
@@ -199,12 +211,24 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, Han
     }
 
     // source
-    if present(&user_message, &["source ?", "sources ?"]) {
-        return Ok("Ça m'est apparu dans un rêve".to_owned());
+    if present_words(&user_message, &["source ?", "sources ?"]) {
+        return Ok(choose(&[
+            "Ça m'est apparu dans un rêve",
+            "Contexte ?",
+            "Moi",
+            "La Laitière",
+            "Manuel Valls",
+            "Mon cul",
+            "Le ciel me l'a dit",
+            "Trust me bro",
+            "Do your own research",
+            "J'ai appris ça sur Internet",
+        ])
+        .to_owned());
     }
 
     // pas mal non
-    if present(&user_message, &["pas mal non"]) {
+    if present_words(&user_message, &["pas mal non"]) {
         return Ok("C'est français :flag_fr:".to_owned());
     }
 
@@ -214,7 +238,7 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, Han
     }
 
     // good bot
-    if bot(&user_message) && present(&user_message, &["bon", "good", "gentil", "nice"]) {
+    if bot && present(&user_message, &["bon", "good", "gentil", "nice"]) {
         return Ok(choose(&[
             ":smiley:",
             ":smile:",
@@ -226,7 +250,7 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, Han
     }
 
     // bad bot
-    if bot(&user_message) && present(&user_message, &["bad", "mauvais", "méchant"]) {
+    if bot && present(&user_message, &["bad", "mauvais", "méchant"]) {
         let reaction = choose(&[
             ":nerd:",
             ":pensive:",
@@ -242,12 +266,12 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, Han
     }
 
     // gay bot
-    if bot(&user_message) && present(&user_message, &["gay"]) {
+    if bot && present(&user_message, &["gay"]) {
         return Ok(choose(&[":hot_face:", ":shushing_face:"]).to_owned());
     }
 
     // ou
-    if bot(&user_message) && present(&user_message, &["ou"]) {
+    if bot && present(&user_message, &["ou"]) {
         return Ok(ou(&user_message).unwrap_or("").to_owned());
     }
 

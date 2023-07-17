@@ -4,7 +4,7 @@ use serenity::model::prelude::interaction::application_command::ApplicationComma
 use serenity::model::prelude::interaction::modal::ModalSubmitInteraction;
 use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::prelude::*;
-use SerenityInteraction::{ApplicationCommand, ModalSubmit, Ping, Autocomplete, MessageComponent};
+use SerenityInteraction::{ApplicationCommand, Autocomplete, MessageComponent, ModalSubmit, Ping};
 
 use crate::utils;
 

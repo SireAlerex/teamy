@@ -7,7 +7,7 @@ use super::{add, clear, del, edit, show};
 use crate::{InteractionMessage, Response};
 
 pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
-    if let Some(option) =  command.data.options.first() {
+    if let Some(option) = command.data.options.first() {
         match option.name.as_str() {
             "add" => add::run(ctx, command).await,
             "del" => del::run(ctx, command).await,
@@ -18,7 +18,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Resp
         }
     } else {
         Response::Message(InteractionMessage::ephemeral("macro no options"))
-    }    
+    }
 }
 
 pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {

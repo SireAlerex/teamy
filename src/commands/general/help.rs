@@ -29,7 +29,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Resp
 
         if let Some(search_group) = groups.find_group(&arg) {
             if let Some(command) = search_group.find_command(&arg) {
-                title = command.names.first().unwrap_or(&"no name").to_string();
+                title = (*command.names.first().unwrap_or(&"no name")).to_string();
                 description = command
                     .desc
                     .unwrap_or("Erreur : pas de description")
@@ -57,7 +57,8 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Resp
                 if command.names.len() > 1 {
                     fields.push((
                         "Aliases",
-                        command.names
+                        command
+                            .names
                             .iter()
                             .skip(1)
                             .map(|s| format!("`{s}`"))
