@@ -22,6 +22,7 @@ async fn run_intern(ctx: &Context) -> Result<PdxLinks, CommandError> {
     update_links(ctx, pdx, results).await
 }
 
+// TODO: optimize ?
 async fn check_links(pdx: &PdxLinks) -> Result<Vec<(PdxGame, Option<String>)>, CommandError> {
     let mut results: Vec<(PdxGame, Result<Option<String>, web_scraper::ScraperError>)> = Vec::new();
     let mut handles = Vec::new();
@@ -38,6 +39,7 @@ async fn check_links(pdx: &PdxLinks) -> Result<Vec<(PdxGame, Option<String>)>, C
     for handle in handles {
         results.push(handle.await?);
     }
+    // TODO: replace with find ?
     for (_, res) in &results {
         if let Err(e) = res {
             return Err(utils::command_error(format!("link threaded error : {e}")));
