@@ -1,67 +1,38 @@
-use crate::utils;
-use crate::{InteractionMessage, Response};
-use serenity::framework::standard::macros::command;
-use serenity::framework::standard::{Args, CommandResult};
-use serenity::model::prelude::command::CommandOptionType;
-use serenity::model::prelude::interaction::application_command::CommandDataOption;
-use serenity::model::prelude::Message;
-use serenity::{
-    builder::CreateApplicationCommand,
-    model::prelude::{
-        command::CommandType, interaction::application_command::ApplicationCommandInteraction,
-    },
-    prelude::Context,
+use crate::{
+    commands::{Context, PoiseError},
+    utils,
 };
+use poise::serenity_prelude as serenity;
 
-#[command]
-#[description = "Nerdifie un texte"]
-#[usage = "<texte à transformer>"]
-pub async fn nerd(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    msg.channel_id.say(&ctx.http, run(args.message())).await?;
+#[poise::command(
+    slash_command,
+    prefix_command,
+    category = "general",
+    description_localized("fr", "Nerdifie un texte")
+)]
+pub async fn nerd(
+    ctx: Context<'_>,
+    #[description = "Texte à transformer"] texte: String,
+) -> Result<(), PoiseError> {
+    ctx.say(nerdify_command(&texte)).await?;
     Ok(())
 }
 
-pub fn run(text: &str) -> String {
+#[poise::command(
+    context_menu_command = "Nerdifie",
+    category = "general",
+    description_localized("fr", "Nerdifie un message")
+)]
+pub async fn nerd_message(ctx: Context<'_>, message: serenity::Message) -> Result<(), PoiseError> {
+    ctx.say(format!(
+        "{} -{}",
+        nerdify_command(&message.content),
+        utils::get_user_name(ctx.guild_id(), ctx.http(), &message.author).await
+    ))
+    .await?;
+    Ok(())
+}
+
+fn nerdify_command(text: &str) -> String {
     format!("\"{} :nerd:\"", utils::nerdify(text))
-}
-
-pub fn run_chat_input(options: &[CommandDataOption]) -> Response {
-    let content =
-        utils::command_option_str(options, "texte").map_or("erreur: pas de texte?".to_owned(), run);
-
-    Response::Message(InteractionMessage::with_content(content))
-}
-
-pub async fn run_message(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
-    let content = match command.data.target_id {
-        Some(target_id) => {
-            let message_id = target_id.to_message_id();
-            match command.channel_id.message(&ctx.http, message_id).await {
-                Ok(message) => format!("{} -{}", run(&message.content), message.author.name),
-                Err(e) => format!("Erreur pour trouver le message ({message_id}) : {e}"),
-            }
-        }
-        None => String::from("Erreur pour accéder au MessageId de l'interaction"),
-    };
-    Response::Message(InteractionMessage::with_content(content))
-}
-
-pub fn register_message(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command.name("nerd").kind(CommandType::Message)
-}
-
-pub fn register_chat_input(
-    command: &mut CreateApplicationCommand,
-) -> &mut CreateApplicationCommand {
-    command
-        .name("nerd")
-        .description("Nerdifie un texte")
-        .create_option(|option| {
-            option
-                .name("texte")
-                .description("Texte à transformer")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
-        .kind(CommandType::ChatInput)
 }

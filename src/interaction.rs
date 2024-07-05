@@ -1,10 +1,13 @@
+use serenity::all::CreateInteractionResponseMessage;
 use serenity::builder::{CreateEmbed, CreateInteractionResponse};
-use serenity::model::application::interaction::Interaction as SerenityInteraction;
-use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
-use serenity::model::prelude::interaction::modal::ModalSubmitInteraction;
-use serenity::model::prelude::interaction::InteractionResponseType;
+// use serenity::model::application::interaction::Interaction as SerenityInteraction;
+use serenity::model::application::Interaction as SerenityInteraction;
+use serenity::model::prelude::{CommandInteraction, InteractionType, ModalInteraction};
+// use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
+// use serenity::model::prelude::interaction::modal::ModalSubmitInteraction;
+// use serenity::model::prelude::interaction::InteractionResponseType;
 use serenity::prelude::*;
-use SerenityInteraction::{ApplicationCommand, Autocomplete, MessageComponent, ModalSubmit, Ping};
+use SerenityInteraction::{Autocomplete, Command, Component, Modal, Ping};
 
 use crate::utils;
 
@@ -28,9 +31,11 @@ impl Interaction {
     pub async fn send(self, ctx: &Context) {
         if let Response::Message(msg) = self.response {
             match self.serenity_interaction {
-                ApplicationCommand(command) => msg.send_from_command(ctx, &command).await,
-                ModalSubmit(modal) => msg.send_from_modal(ctx, &modal).await,
-                Ping(_) | MessageComponent(_) | Autocomplete(_) => (),
+                Command(command) => msg.send_from_command(ctx, &command).await,
+                Modal(modal) => msg.send_from_modal(ctx, &modal).await,
+                Ping(_) | Component(_) | Autocomplete(_) => (),
+                // TODO: check here
+                _ => (),
             }
         }
     }
@@ -73,43 +78,60 @@ impl InteractionMessage {
         }
     }
 
-    pub async fn send_from_command(self, ctx: &Context, command: &ApplicationCommandInteraction) {
+    pub async fn send_from_command(self, ctx: &Context, command: &CommandInteraction) {
         if let Err(why) = command
-            .create_interaction_response(&ctx.http, |response| {
-                self.channel_message_with_source(response)
-            })
+            // TODO: check if still works
+            // .create_interaction_response(&ctx.http, |response| {
+            //     self.channel_message_with_source(response)
+            // })
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new().content("send_from_command"),
+                ),
+            )
             .await
         {
-            let error_message = format!("Erreur lors de la réponse à l'interaction : {why}");
+            let error_message =
+                format!("(from_command) Erreur lors de la réponse à l'interaction : {why}");
             utils::say_or_error(ctx, command.channel_id, error_message).await;
         }
     }
 
-    pub async fn send_from_modal(self, ctx: &Context, modal: &ModalSubmitInteraction) {
+    pub async fn send_from_modal(self, ctx: &Context, modal: &ModalInteraction) {
         if let Err(why) = modal
-            .create_interaction_response(&ctx.http, |response| {
-                self.channel_message_with_source(response)
-            })
+            // TODO: check if still works
+            // .create_response(&ctx.http, |response| {
+            //     self.channel_message_with_source(response)
+            // })
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new().content("send_from_modal"),
+                ),
+            )
             .await
         {
-            let error_message = format!("Erreur lors de la réponse à l'interaction : {why}");
+            let error_message =
+                format!("(from_modal) Erreur lors de la réponse à l'interaction : {why}");
             utils::say_or_error(ctx, modal.channel_id, error_message).await;
         }
     }
 
-    fn channel_message_with_source<'a, 'b>(
+    fn channel_message_with_source<'a>(
         self,
-        response: &'a mut CreateInteractionResponse<'b>,
-    ) -> &'a mut CreateInteractionResponse<'b> {
+        response: &'a mut CreateInteractionResponse,
+    ) -> &'a mut CreateInteractionResponse {
+        // FIXME: re-add logic
         response
-            .kind(InteractionResponseType::ChannelMessageWithSource)
-            .interaction_response_data(move |message| {
-                let m = message.content(self.content).ephemeral(self.ephemeral);
-                if let Some(e) = self.embed {
-                    m.add_embed(e)
-                } else {
-                    m
-                }
-            })
+        // .kind(InteractionType::ChannelMessageWithSource)
+        // .interaction_response_data(move |message| {
+        //     let m = message.content(self.content).ephemeral(self.ephemeral);
+        //     if let Some(e) = self.embed {
+        //         m.add_embed(e)
+        //     } else {
+        //         m
+        //     }
+        // })
     }
 }

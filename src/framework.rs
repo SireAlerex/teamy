@@ -77,16 +77,21 @@ pub async fn get_framework(http: Http) -> Result<StandardFramework, Error> {
     let (owners, _bot_id) = match http.get_current_application_info().await {
         Ok(info) => {
             let mut owners = HashSet::new();
-            owners.insert(info.owner.id);
+            if let Some(owner) = info.owner {
+                owners.insert(owner.id);
 
-            (owners, info.id)
+                (owners, info.id)
+            } else {
+                return Err(anyhow!("no owner").into());
+            }            
         }
         Err(why) => return Err(anyhow!("Could not access application info: {why:?}").into()),
     };
 
+    // TODO: remove after poise
     let framework = StandardFramework::new()
-        .configure(|c| c.owners(owners).prefix("$"))
-        .after(after)
+        // .configure(|c| c.owners(owners).prefix("$"))
+        // .after(after)
         .help(&MY_HELP)
         .normal_message(normal_message)
         .group(&GENERAL_GROUP)

@@ -1,71 +1,52 @@
-use crate::utils;
-use crate::{InteractionMessage, Response};
-use serenity::{
-    builder::CreateApplicationCommand,
-    framework::standard::{macros::command, CommandResult},
-    model::prelude::{
-        command::{CommandOptionType, CommandType},
-        interaction::application_command::{ApplicationCommandInteraction, CommandDataOption},
-        Message,
-    },
-    prelude::Context,
+use crate::{
+    commands::{Context, PoiseError},
+    utils,
 };
+use poise::serenity_prelude as serenity;
 
-#[command]
-#[description = "Détermine si quelque chose est basé"]
-#[usage = "<texte>"]
-pub async fn basé(ctx: &Context, msg: &Message) -> CommandResult {
-    let _: Message = msg.channel_id.say(&ctx.http, based()).await?;
+#[poise::command(
+    slash_command,
+    prefix_command,
+    category = "general",
+    description_localized("fr", "Détermine si quelque chose est basé")
+)]
+pub async fn based(
+    ctx: Context<'_>,
+    #[description = "basé ou cringe ?"] texte: String,
+) -> Result<(), PoiseError> {
+    ctx.say(format!("\"{texte}\"\n{}", get_based())).await?;
     Ok(())
 }
 
-fn based<'a>() -> &'a str {
+#[poise::command(
+    context_menu_command = "Message basé ?",
+    category = "general",
+    description_localized("fr", "Détermine si un message est basé")
+)]
+pub async fn based_message(ctx: Context<'_>, message: serenity::Message) -> Result<(), PoiseError> {
+    ctx.say(format!("\"{}\"\n{}", message.content, get_based()))
+        .await?;
+    Ok(())
+}
+
+#[poise::command(
+    context_menu_command = "Basé",
+    description_localized("fr", "Détermine si quelqu'un est basé")
+)]
+pub async fn based_user(ctx: Context<'_>, user: serenity::User) -> Result<(), PoiseError> {
+    ctx.say(format!(
+        "{} est {}",
+        utils::get_user_name(ctx.guild_id(), ctx.http(), &user).await,
+        get_based().to_lowercase()
+    ))
+    .await?;
+    Ok(())
+}
+
+fn get_based<'a>() -> &'a str {
     if rand::random::<bool>() {
         "Basé"
     } else {
         "Cringe"
     }
-}
-
-pub async fn run_message(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
-    let content = match command.data.target_id {
-        Some(target_id) => {
-            let message_id = target_id.to_message_id();
-            match command.channel_id.message(&ctx.http, message_id).await {
-                Ok(message) => format!("\"{}\"\n{}", message.content, based()),
-                Err(e) => format!("Erreur pour trouver le message ({message_id}) : {e}"),
-            }
-        }
-        None => String::from("Erreur pour accéder au MessageId de l'interaction"),
-    };
-    Response::Message(InteractionMessage::with_content(content))
-}
-
-pub fn run_chat_input(options: &[CommandDataOption]) -> Response {
-    let content = format!(
-        "\"{}\"\n{}",
-        utils::command_option_str(options, "texte").unwrap_or("<erreur>"),
-        based()
-    );
-    Response::Message(InteractionMessage::with_content(content))
-}
-
-pub fn register_message(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command.name("basé").kind(CommandType::Message)
-}
-
-pub fn register_chat_input(
-    command: &mut CreateApplicationCommand,
-) -> &mut CreateApplicationCommand {
-    command
-        .name("basé")
-        .description("Détermine si quelque chose est basé")
-        .create_option(|option| {
-            option
-                .name("texte")
-                .description("basé ou cringe ?")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
-        .kind(CommandType::ChatInput)
 }

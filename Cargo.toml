@@ -11,17 +11,18 @@ anyhow = "1.0.72"
 bson = { version = "2.6.1", features = ["chrono-0_4"] }
 chrono = "0.4.26"
 futures = "0.3.28"
-itertools = "0.11.0"
-mongodb = "2.6.0"
+itertools = "0.13.0"
+mongodb = "3.0.0"
 rand = "0.8.5"
 regex = "1.9.1"
-reqwest = {version = "0.11.18", features = ["blocking"]} 
+reqwest = {version = "0.12.5", features = ["blocking", "stream"]} 
 serde = "1.0.174"
-serenity = { version = "0.11.6", default-features = false, features = ["client", "gateway", "rustls_backend", "model", "cache", "framework", "standard_framework", "utils"] }
-shuttle-runtime = "0.28.0"
-shuttle-secrets = "0.28.0"
-shuttle-serenity = "0.28.0"
-scraper = "0.17.1"
+serenity = { version = "0.12.2", default-features = false, features = ["client", "gateway", "rustls_backend", "model", "cache", "framework", "standard_framework", "utils"] }
+shuttle-runtime = "0.46.0"
+# shuttle-secrets = "0.41.0"
+shuttle-serenity = "0.46.0"
+scraper = "0.19.0"
 tokio = "1.29.1"
 tracing = "0.1.37"
 sys-info = "0.9.1"
+poise = "0.6.1"

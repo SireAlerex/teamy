@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::anyhow;
 use shuttle_runtime::Error;
-use shuttle_secrets::SecretStore;
+use shuttle_runtime::SecretStore;
 
 pub fn get(secret_store: &SecretStore, key: &str) -> Result<String, Error> {
     secret_store

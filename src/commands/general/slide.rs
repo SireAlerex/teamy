@@ -1,32 +1,20 @@
-use crate::{InteractionMessage, Response};
-use serenity::builder::CreateApplicationCommand;
-use serenity::framework::standard::macros::command;
-use serenity::framework::standard::CommandResult;
-use serenity::model::prelude::command::CommandType;
-use serenity::model::prelude::interaction::application_command::ApplicationCommandInteraction;
-use serenity::model::prelude::Message;
-use serenity::prelude::Context;
+use crate::commands::{Context as PoiseContext, PoiseError};
+use serenity::all::CreateMessage;
 
-#[command]
-#[description = "Slide dans tes dm"]
-async fn slide(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.author.dm(&ctx.http, |m| m.content("Salut !")).await?;
-
-    Ok(())
-}
-
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) -> Response {
-    match command.user.dm(&ctx.http, |m| m.content("Salut !")).await {
-        Ok(_) => Response::Message(InteractionMessage::ephemeral("Un DM va être envoyé")),
-        Err(e) => Response::Message(InteractionMessage::ephemeral(format!(
-            "Une erreur c'est produite : {e}"
-        ))),
+#[poise::command(
+    slash_command,
+    prefix_command,
+    category = "general",
+    description_localized("fr", "Slide dans tes dm"),
+    ephemeral
+)]
+pub async fn slide(ctx: PoiseContext<'_>) -> Result<(), PoiseError> {
+    if ctx.prefix() == "/" {
+        let _ = ctx.say("Un DM va être envoyé").await?;
     }
-}
-
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("slide")
-        .description("Slide dans tes dm")
-        .kind(CommandType::ChatInput)
+    let _ = ctx
+        .author()
+        .dm(ctx.http(), CreateMessage::new().content("Salut !"))
+        .await?;
+    Ok(())
 }

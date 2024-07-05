@@ -1,5 +1,4 @@
-use crate::commands::general::nerd;
-use crate::db;
+use crate::{db, utils};
 use rand::seq::SliceRandom;
 use serenity::{
     model::{channel::Message, prelude::*},
@@ -49,7 +48,10 @@ fn substring_count(string: &str, targets: &[&str]) -> usize {
 
 fn fullword_count(string: &str, targets: &[&str]) -> usize {
     let lowercase_targets: Vec<String> = targets.iter().map(|s| s.to_lowercase()).collect();
-    let compare: Vec<&str> = lowercase_targets.iter().map(std::string::String::as_str).collect();
+    let compare: Vec<&str> = lowercase_targets
+        .iter()
+        .map(std::string::String::as_str)
+        .collect();
     string
         .split_whitespace()
         .filter(|word| compare.contains(word))
@@ -146,22 +148,18 @@ async fn mute_checks(ctx: &Context, msg: &Message) -> bool {
         .unwrap_or(false)
 }
 
-pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, HandleMessageError> {
+pub async fn handle_reaction(
+    ctx: &Context,
+    msg: &Message,
+) -> Result<Option<String>, HandleMessageError> {
     let user_message = msg.content.to_lowercase();
-    let user = msg.author.clone();
 
-    if mute_checks(ctx, msg).await {
-        return Ok(String::new());
-    }
+    // FIXME
+    // if mute_checks(ctx, msg).await {
+    //     return Ok(None);
+    // }
 
-    let user_nick = if let Some(guild_id) = msg.guild_id {
-        match user.nick_in(&ctx.http, guild_id).await {
-            Some(nick) => nick,
-            None => user.name,
-        }
-    } else {
-        user.name
-    };
+    let user_nick = utils::get_user_name(msg.guild_id, ctx.http(), &msg.author).await;
     let bot = bot(&user_message);
 
     // emoji reactions
@@ -181,7 +179,7 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, Han
     // string reactions
     // bonjour bot
     if bot && present(&user_message, &SALUTATIONS) {
-        return Ok(format!("{} {} !", choose(&SALUTATIONS), user_nick));
+        return Ok(Some(format!("{} {} !", choose(&SALUTATIONS), user_nick)));
     }
 
     // societer
@@ -189,12 +187,12 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, Han
         &user_message,
         &["société", "societe", "societer", "saucisse"],
     ) {
-        return Ok(emoji_or(ctx, msg.guild_id, "saucisse").await);
+        return Ok(Some(emoji_or(ctx, msg.guild_id, "saucisse").await));
     }
 
     // sus
     if present(&user_message, &["sus", "sussy"]) {
-        return Ok(emoji_or(ctx, msg.guild_id, "afungus").await);
+        return Ok(Some(emoji_or(ctx, msg.guild_id, "afungus").await));
     }
 
     // civ bedge
@@ -202,51 +200,55 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, Han
         && present(&user_message, &["civ"])
         && present(&user_message, &["Thomas"])
     {
-        return Ok(emoji_or(ctx, msg.guild_id, "bedge").await);
+        return Ok(Some(emoji_or(ctx, msg.guild_id, "bedge").await));
     }
 
     // cum
     if present(&user_message, &["cum", "cummies", "cummy"]) {
-        return Ok(":milk:".to_owned());
+        return Ok(Some(":milk:".to_owned()));
     }
 
     // source
     if present_words(&user_message, &["source ?", "sources ?"]) {
-        return Ok(choose(&[
-            "Ça m'est apparu dans un rêve",
-            "Contexte ?",
-            "Moi",
-            "La Laitière",
-            "Manuel Valls",
-            "Mon cul",
-            "Le ciel me l'a dit",
-            "Trust me bro",
-            "Do your own research",
-            "J'ai appris ça sur Internet",
-        ])
-        .to_owned());
+        return Ok(Some(
+            choose(&[
+                "Ça m'est apparu dans un rêve",
+                "Contexte ?",
+                "Moi",
+                "La Laitière",
+                "Manuel Valls",
+                "Mon cul",
+                "Le ciel me l'a dit",
+                "Trust me bro",
+                "Do your own research",
+                "J'ai appris ça sur Internet",
+            ])
+            .to_owned(),
+        ));
     }
 
     // pas mal non
     if present_words(&user_message, &["pas mal non"]) {
-        return Ok("C'est français :flag_fr:".to_owned());
+        return Ok(Some("C'est français :flag_fr:".to_owned()));
     }
 
     // quoi
     if endwith(&user_message, &["quoi", "quoi ?"]) {
-        return Ok(choose(&["quoicoubeh", "feur"]).to_owned());
+        return Ok(Some(choose(&["quoicoubeh", "feur"]).to_owned()));
     }
 
     // good bot
     if bot && present(&user_message, &["bon", "good", "gentil", "nice"]) {
-        return Ok(choose(&[
-            ":smiley:",
-            ":smile:",
-            ":grin:",
-            ":blush:",
-            ":smiling_face_with_3_hearts:",
-        ])
-        .to_owned());
+        return Ok(Some(
+            choose(&[
+                ":smiley:",
+                ":smile:",
+                ":grin:",
+                ":blush:",
+                ":smiling_face_with_3_hearts:",
+            ])
+            .to_owned(),
+        ));
     }
 
     // bad bot
@@ -260,20 +262,20 @@ pub async fn handle_reaction(ctx: &Context, msg: &Message) -> Result<String, Han
             ":cry:",
         ]);
         return match reaction {
-            ":nerd:" => Ok(nerd::run(&user_message)),
-            _ => Ok(reaction.to_owned()),
+            ":nerd:" => Ok(Some(utils::nerdify(&user_message))),
+            _ => Ok(Some(reaction.to_owned())),
         };
     }
 
     // gay bot
     if bot && present(&user_message, &["gay"]) {
-        return Ok(choose(&[":hot_face:", ":shushing_face:"]).to_owned());
+        return Ok(Some(choose(&[":hot_face:", ":shushing_face:"]).to_owned()));
     }
 
     // ou
     if bot && present(&user_message, &["ou"]) {
-        return Ok(ou(&user_message).unwrap_or("").to_owned());
+        return Ok(Some(ou(&user_message).unwrap_or("").to_owned()));
     }
 
-    Ok(String::new())
+    Ok(None)
 }

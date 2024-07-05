@@ -210,7 +210,7 @@ pub async fn modal(ctx: &Context, command: &ApplicationCommandInteraction) {
         })
         .await
     {
-        let error_message = format!("Erreur lors de la réponse à l'interaction : {why}");
+        let error_message = format!("(macros.add.modal) Erreur lors de la réponse à l'interaction : {why}");
         utils::say_or_error(ctx, command.channel_id, error_message).await;
     }
 }

@@ -1,17 +1,13 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use poise::serenity_prelude;
 use serenity::{
-    client::bridge::gateway::ShardId,
-    framework::standard::CommandError,
+    all::{CacheHttp, GuildId},
     gateway::ConnectionStage,
-    json::Value,
     model::{
-        prelude::{
-            interaction::application_command::{ApplicationCommandInteraction, CommandDataOption},
-            ChannelId, Message,
-        },
-        user::User,
+        id::ShardId,
+        prelude::{ChannelId, CommandInteraction},
     },
     prelude::Context,
 };
@@ -30,9 +26,9 @@ impl RunnerInfo {
         let Some(shard_manager) = data.get::<ShardManagerContainer>() else {
             return Err("There was a problem getting the shard manager");
         };
-        let manager = shard_manager.lock().await;
+        let manager = shard_manager;
         let runners = manager.runners.lock().await;
-        let Some(runner) = runners.get(&ShardId(ctx.shard_id)) else {
+        let Some(runner) = runners.get(&ShardId(ctx.shard_id.0)) else {
             return Err("No shard found");
         };
         Ok(RunnerInfo {
@@ -42,23 +38,40 @@ impl RunnerInfo {
     }
 }
 
-pub async fn find_message(
-    ctx: &Context,
-    user: &User,
-    channel: &ChannelId,
-    text: String,
-) -> Result<Message, serenity::Error> {
-    if let Some(m) = channel
-        .messages(&ctx.http, |retriever| retriever.limit(10))
-        .await?
-        .iter()
-        .find(|m: &&Message| m.author == user.clone() && m.content == text)
-    {
-        Ok(m.clone())
-    } else {
-        Err(serenity::Error::Other("Aucun message correspondant"))
+pub async fn get_user_name<'a>(
+    maybe_guild_id: Option<GuildId>,
+    cache_http: impl CacheHttp,
+    user: &serenity_prelude::User,
+) -> String {
+    if let Some(guild_id) = maybe_guild_id {
+        if let Some(nick) = user.nick_in(cache_http, guild_id).await {
+            return nick;
+        } else if let Some(global_name) = user.global_name.clone() {
+            return global_name;
+        }
     }
+    user.name.clone()
 }
+
+// TODO: need a message to research from as a parameter ?
+// pub async fn find_message(
+//     ctx: &Context,
+//     user: &User,
+//     channel: &ChannelId,
+//     text: String,
+// ) -> Result<Message, serenity::Error> {
+//     if let Some(m) = channel
+//         // .messages(&ctx.http, |retriever| retriever.limit(10))
+//         .messages(&ctx.http, GetMessages::new().after(m))
+//         .await?
+//         .iter()
+//         .find(|m: &&Message| m.author == user.clone() && m.content == text)
+//     {
+//         Ok(m.clone())
+//     } else {
+//         Err(serenity::Error::Other("Aucun message correspondant"))
+//     }
+// }
 
 pub fn first_letter(s: &str) -> Option<char> {
     s.chars().next()
@@ -93,7 +106,7 @@ pub fn nerdify(text: &str) -> String {
         .collect()
 }
 
-pub fn admin_command(command: &ApplicationCommandInteraction) -> bool {
+pub fn admin_command(command: &CommandInteraction) -> bool {
     match command.member.as_ref() {
         Some(member) => match member.permissions {
             Some(perm) => perm.administrator(),
@@ -122,10 +135,6 @@ pub async fn say_or_error2(ctx: &Context, channel_id: ChannelId, content: &str) 
     }
 }
 
-pub fn command_error<T: Into<String>>(message: T) -> CommandError {
-    Box::<dyn std::error::Error + Send + Sync>::from(message.into())
-}
-
 pub async fn get_temp_chan(ctx: &Context) -> Option<Arc<ChannelId>> {
     let data = ctx.data.read().await;
     let Some(temp_chan_mutex) = data.get::<crate::TempChanContainer>() else {
@@ -134,36 +143,4 @@ pub async fn get_temp_chan(ctx: &Context) -> Option<Arc<ChannelId>> {
     };
     let temp_chan_id = temp_chan_mutex;
     Some(Arc::clone(temp_chan_id))
-}
-
-fn get_option<'a>(data: &'a CommandDataOption, name: &str) -> Option<&'a Value> {
-    data.options
-        .iter()
-        .find(|o| o.name == *name)?
-        .value
-        .as_ref()
-}
-
-pub fn command_option<'a>(options: &'a [CommandDataOption], name: &str) -> Option<&'a Value> {
-    options
-        .iter()
-        .find(|option| option.name == *name)?
-        .value
-        .as_ref()
-}
-
-pub fn command_option_str<'a>(options: &'a [CommandDataOption], name: &str) -> Option<&'a str> {
-    command_option(options, name).and_then(serenity::json::Value::as_str)
-}
-
-pub fn option_as_str<'a>(data: &'a CommandDataOption, name: &str) -> Option<&'a str> {
-    if let Some(v) = get_option(data, name) {
-        if let Some(s) = v.as_str() {
-            Some(s)
-        } else {
-            None
-        }
-    } else {
-        None
-    }
 }

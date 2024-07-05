@@ -1,18 +1,12 @@
-use crate::{utils, InteractionMessage, Response};
+use anyhow::anyhow;
 use itertools::Itertools;
 use rand::Rng;
-use serenity::builder::CreateApplicationCommand;
-use serenity::framework::standard::macros::command;
-use serenity::framework::standard::{Args, CommandError, CommandResult};
-use serenity::model::application::command::CommandOptionType;
-use serenity::model::prelude::interaction::application_command::{
-    CommandDataOption, CommandDataOptionValue,
-};
-use serenity::model::prelude::*;
-use serenity::prelude::Context;
 use std::cmp::Ordering;
 use std::fmt::Display;
 use std::str::FromStr;
+
+use crate::commands::{Context as PoiseContext, PoiseError};
+use poise::serenity_prelude;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Ord, PartialOrd, Hash, Default)]
 pub enum DropKeep {
@@ -25,7 +19,7 @@ pub enum DropKeep {
 }
 
 impl FromStr for DropKeep {
-    type Err = Box<dyn std::error::Error + Send + Sync>;
+    type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
         if s.is_empty() {
             return Ok(DropKeep::None);
@@ -33,7 +27,7 @@ impl FromStr for DropKeep {
 
         let re = regex::Regex::new(r"(?P<dk>kh|kl|k|dh|dl|d)(?P<dk_val>\d+)")?;
         let Some(caps) = re.captures(s) else {
-            return Err(utils::command_error("erreur captures regex"))
+            return Err(anyhow!("erreur captures regex"));
         };
 
         let dk = if let Some(m) = caps.name("dk") {
@@ -43,7 +37,7 @@ impl FromStr for DropKeep {
         };
         let dk_val = match caps.name("dk_val") {
             Some(m) => m.as_str(),
-            None => return Err(utils::command_error("erreur roll regex drop/keep : dk_val")),
+            None => return Err(anyhow!("erreur roll regex drop/keep : dk_val")),
         }
         .parse::<u64>()?;
 
@@ -52,7 +46,7 @@ impl FromStr for DropKeep {
             "dh" => Ok(DropKeep::DH(dk_val)),
             "k" | "kh" => Ok(DropKeep::KH(dk_val)),
             "kl" => Ok(DropKeep::KL(dk_val)),
-            _ => return Err(utils::command_error("erreur roll regex drop/keep : dk")),
+            _ => Err(anyhow!("erreur roll regex drop/keep : dk")),
         }
     }
 }
@@ -134,7 +128,7 @@ impl Roll {
             show_res(&s, res.to_string(), self.number, self.modifier)
         );
         Ok(RollResult {
-            roll: self,
+            roll: *self,
             rolls: new_rolls,
             message,
         })
@@ -166,13 +160,13 @@ impl std::fmt::Display for Roll {
 }
 
 impl FromStr for Roll {
-    type Err = Box<dyn std::error::Error + Send + Sync>;
+    type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
         let re = regex::Regex::new(
             r"(?P<number>\d+)?d(?P<size>\d+)(?P<modifier>\+\d+|-\d+)?(?P<dk>kh\d+|kl\d+|k\d+|dh\d+|dl\d+|d\d+)?",
         )?;
         let Some(caps) = re.captures(s) else {
-            return Err(utils::command_error("erreur captures regex"))
+            return Err(anyhow!("erreur captures regex"));
         };
 
         let number = match caps.name("number") {
@@ -181,16 +175,14 @@ impl FromStr for Roll {
         }
         .parse::<u64>()?;
         if !(1..=200).contains(&number) {
-            return Err(utils::command_error(
-                "le nombre de dés doit appartenir à [1; 200]",
-            ));
+            return Err(anyhow!("le nombre de dés doit appartenir à [1; 200]",));
         }
         let size = match caps.name("size") {
             Some(m) => m.as_str().parse::<u64>()?,
-            None => return Err(utils::command_error("erreur pas de taille de dé")),
+            None => return Err(anyhow!("erreur pas de taille de dé")),
         };
         if size <= 1 {
-            return Err(utils::command_error(
+            return Err(anyhow!(
                 "la taille du dé doit être supérieure strictement à 1",
             ));
         }
@@ -206,9 +198,7 @@ impl FromStr for Roll {
 
         if let Some(x) = dk.get() {
             if x > number {
-                return Err(utils::command_error(
-                    "valeur du drop/keep doit être <= nombre de dés",
-                ));
+                return Err(anyhow!("valeur du drop/keep doit être <= nombre de dés",));
             }
         }
 
@@ -277,50 +267,90 @@ impl RollBuilder {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd, Hash)]
-pub struct RollResult<'a> {
-    roll: &'a Roll,
+pub struct RollResult {
+    roll: Roll,
     rolls: Vec<u64>,
     message: String,
 }
 
-impl RollResult<'_> {
+impl RollResult {
     #[allow(dead_code)]
     pub fn sum(&self) -> Result<i64, std::num::TryFromIntError> {
         sum(&self.rolls, self.roll.modifier)
     }
 }
 
-impl Display for RollResult<'_> {
+impl Display for RollResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "{}", self.message)
     }
 }
 
-#[command]
-#[aliases("r")]
-#[description = "Lancer de dés"]
-#[usage = "<nombre de dés>d<taille des dés>+<modificateur><drop/keep><valeur du drop/keep>"]
-#[example = "2d6+3"]
-#[example = "3d4-1"]
-#[example = "d8"]
-#[example = "4d6k3 (équivalent à 4d6kh3)"]
-#[example = "4d6d1 (équivalent à 4d6dl1)"]
-#[example = "2d20dh1"]
-#[example = "2d20kl1"]
-pub async fn roll(ctx: &Context, msg: &Message, args: Args) -> CommandResult {
-    let _: Message = roll_intern(ctx, &msg.channel_id, args).await?;
+#[poise::command(
+    slash_command,
+    category = "general",
+    description_localized("fr", "Lancer de dés")
+)]
+pub async fn roll(
+    ctx: PoiseContext<'_>,
+    #[description = "Taille des dés"]
+    #[min = 2_u64]
+    size: u64,
+    #[description = "Nombre de dés"]
+    #[min = 1_u64]
+    #[max = 200_u64]
+    number: Option<u64>,
+    #[description = "Modificateur"] modifier: Option<i64>,
+    #[description = "Valeurs possibles : (k, kh, kl, d, dh, dl) suivi d'un nombre"]
+    drop_keep: Option<String>,
+) -> Result<(), PoiseError> {
+    ctx.say(roll_intern(size, number, modifier, drop_keep)?.message)
+        .await?;
     Ok(())
 }
 
-pub async fn roll_intern(
-    ctx: &Context,
-    channel_id: &ChannelId,
-    args: Args,
-) -> Result<Message, CommandError> {
-    channel_id
-        .say(&ctx.http, Roll::from_str(args.message())?.roll()?)
-        .await
-        .map_err(|e| utils::command_error(e.to_string()))
+fn roll_intern(
+    size: u64,
+    maybe_number: Option<u64>,
+    maybe_modifer: Option<i64>,
+    maybe_drop_keep: Option<String>,
+) -> Result<RollResult, PoiseError> {
+    let mut builder = RollBuilder::new();
+    if let Some(number) = maybe_number {
+        builder.number(number);
+    }
+    if let Some(modifier) = maybe_modifer {
+        builder.modifier(modifier);
+    }
+    if let Some(s) = maybe_drop_keep {
+        builder.drop_keep(DropKeep::from_str(&s)?);
+    }
+    let roll = builder.size(size).build();
+
+    let res = roll.roll()?;
+    Ok(res)
+}
+
+#[poise::command(
+    prefix_command,
+    aliases("r"),
+    rename = "roll",
+    category = "general",
+    description_localized("fr", "Lancer de dés")
+)]
+pub async fn roll_prefix(ctx: PoiseContext<'_>, roll_str: String) -> Result<(), PoiseError> {
+    roll_intern_str(ctx.serenity_context(), &ctx.channel_id(), roll_str).await
+}
+
+pub async fn roll_intern_str(
+    ctx: &serenity_prelude::Context,
+    channel_id: &serenity_prelude::ChannelId,
+    roll_str: String,
+) -> Result<(), PoiseError> {
+    let roll = Roll::from_str(&roll_str)?;
+    let res = roll.roll()?;
+    let _ = channel_id.say(&ctx.http, res.message).await?;
+    Ok(())
 }
 
 fn sum(rolls: &[u64], modifier: i64) -> Result<i64, std::num::TryFromIntError> {
@@ -385,98 +415,6 @@ fn add_modifier(s: String, modifier: i64) -> String {
         Ordering::Less => format!("{s} ({modifier})"),
         Ordering::Equal => s,
     }
-}
-
-// TODO: refactor as wrapper with result<interaction, string> for error handling
-pub fn run_chat_input(options: &[CommandDataOption]) -> Response {
-    let mut raw_number = 1;
-    let mut raw_size = 0;
-    let mut modifier = 0;
-    let mut init_dk = String::new();
-
-    for arg in options {
-        if let Some(value) = arg.resolved.as_ref() {
-            match arg.name.as_str() {
-                "number" => {
-                    if let CommandDataOptionValue::Integer(x) = value {
-                        raw_number = *x;
-                    }
-                }
-                "size" => {
-                    if let CommandDataOptionValue::Integer(x) = value {
-                        raw_size = *x;
-                    }
-                }
-                "modifier" => {
-                    if let CommandDataOptionValue::Integer(x) = value {
-                        modifier = *x;
-                    }
-                }
-                "drop_keep" => {
-                    if let CommandDataOptionValue::String(s) = value {
-                        init_dk = s.to_string();
-                    }
-                }
-                _ => (),
-            }
-        }
-    }
-    let Ok(number): Result<u64, _> = raw_number.try_into() else {
-        return Response::Message(InteractionMessage::ephemeral("erreur dice number conversion"));
-    };
-    let Ok(size): Result<u64, _> = raw_size.try_into() else {
-        return Response::Message(InteractionMessage::ephemeral("erreur dice size conversion"));
-    };
-
-    let Ok(dk) = DropKeep::from_str(&init_dk) else {
-        return Response::Message(InteractionMessage::ephemeral("erre dk"));
-    };
-    let r = RollBuilder::new()
-        .number(number)
-        .size(size)
-        .modifier(modifier)
-        .drop_keep(dk)
-        .build();
-
-    let content = match r.roll() {
-        Ok(roll) => roll.to_string(),
-        Err(e) => e.to_string(),
-    };
-    Response::Message(InteractionMessage::with_content(content))
-}
-
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("roll")
-        .description("Lancer de dés")
-        .create_option(|option| {
-            option
-                .name("size")
-                .description("Taille des dés")
-                .kind(CommandOptionType::Integer)
-                .min_int_value(2_u64)
-                .required(true)
-        })
-        .create_option(|option| {
-            option
-                .name("number")
-                .description("Nombre de dés")
-                .kind(CommandOptionType::Integer)
-                .min_int_value(1_u64)
-                .max_int_value(200_u64)
-        })
-        .create_option(|option| {
-            option
-                .name("modifier")
-                .description("Modificateur")
-                .kind(CommandOptionType::Integer)
-        })
-        .create_option(|option| {
-            option
-                .name("drop_keep")
-                .description("Valeur possibles : (k, kh, kl, d, dh, dl) suivi d'un nombre")
-                .kind(CommandOptionType::String)
-        })
 }
 
 #[cfg(test)]

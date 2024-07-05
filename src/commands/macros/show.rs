@@ -40,7 +40,7 @@ async fn macro_embed(ctx: &Context, user: &User) -> Result<CreateEmbed, CommandE
             .join("\n")
     };
     let embed = CreateEmbed::default()
-        .description(format!("Macros de {}", user.name))
+        .description(format!("Macros de {}", user.name)) // FIXME: use utils to get user name
         .field("Macros", pretty_macros, false)
         .color(serenity::utils::Colour::PURPLE)
         .clone();

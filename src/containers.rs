@@ -1,12 +1,11 @@
 use std::sync::Arc;
 
-use serenity::{client::bridge::gateway::ShardManager, model::prelude::*, prelude::*};
-use tokio::sync::Mutex;
+use serenity::{gateway::ShardManager, model::prelude::*, prelude::*};
 
 pub struct ShardManagerContainer;
 
 impl TypeMapKey for ShardManagerContainer {
-    type Value = Arc<Mutex<ShardManager>>;
+    type Value = Arc<ShardManager>;
 }
 
 pub struct GuildGroup(pub Vec<GuildId>);

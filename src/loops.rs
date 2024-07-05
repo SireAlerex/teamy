@@ -1,6 +1,8 @@
 use chrono::prelude::*;
 use rand::{seq::IteratorRandom, thread_rng};
-use serenity::model::prelude::Activity;
+use serenity::all::ActivityData;
+use serenity::all::CreateEmbed;
+use serenity::all::CreateMessage;
 use serenity::prelude::Context;
 use std::sync::Arc;
 use tracing::error;
@@ -25,11 +27,12 @@ pub async fn log_system_load(ctx: Arc<Context>) {
         ),
         Err(e) => format!("error while getting memory info : {e}"),
     };
-    let latency = if let Ok(runner) = utils::RunnerInfo::info(Arc::clone(&ctx)).await {
-        runner.latency
-    } else {
-        error!("There was a problem getting runner info of shard");
-        return;
+    let latency = match utils::RunnerInfo::info(Arc::clone(&ctx)).await {
+        Ok(runner) => runner.latency,
+        Err(err) => {
+            error!("There was a problem getting runner info of shard: {err}");
+            return;
+        }
     };
 
     let data = ctx.data.read().await;
@@ -39,15 +42,17 @@ pub async fn log_system_load(ctx: Arc<Context>) {
     };
 
     let message = log_chan_id
-        .send_message(&ctx, |m| {
-            m.embed(|e| {
-                e.title("System Resource Load")
+        .send_message(
+            &ctx,
+            CreateMessage::new().embed(
+                CreateEmbed::new()
+                    .title("System Resource Load")
                     .field("Time", time, false)
                     .field("CPU Load Average", cpu_load, false)
                     .field("Memory Usage", mem_use, false)
-                    .field("Latency", format!("{latency:?}"), false)
-            })
-        })
+                    .field("Latency", format!("{latency:?}"), false),
+            ),
+        )
         .await;
     if let Err(why) = message {
         error!("Error sending message: {why:?}");
@@ -55,7 +60,7 @@ pub async fn log_system_load(ctx: Arc<Context>) {
 }
 
 pub fn status_loop(ctx: &Arc<Context>) {
-    let game = &[
+    let game = [
         "LoL avec les boys",
         "Deep Rock Galactic avec les boys",
         "Pathfinder avec les boys",
@@ -68,5 +73,5 @@ pub fn status_loop(ctx: &Arc<Context>) {
     .iter()
     .choose(&mut thread_rng())
     .unwrap_or(&"no game :(");
-    ctx.shard.set_activity(Some(Activity::playing(game)));
+    ctx.shard.set_activity(Some(ActivityData::playing(*game)));
 }

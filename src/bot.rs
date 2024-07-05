@@ -1,18 +1,16 @@
+use std::error::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use serenity::model::application::command::Command;
-use serenity::model::application::interaction::Interaction as SerenityInteraction;
-use serenity::model::prelude::command::CommandType;
-use serenity::model::prelude::*;
+use poise::{serenity_prelude, Framework};
+use serenity::model::application::Command;
 use serenity::{async_trait, prelude::*};
 use tracing::{error, info};
-use SerenityInteraction::{ApplicationCommand, Autocomplete, MessageComponent, ModalSubmit, Ping};
 
-use crate::interaction::{Interaction, InteractionMessage, Response};
-use crate::{commands, interaction, loops, GuildIdContainer};
-use commands::{general, macros, pdx};
+use crate::commands::{general::roll, PoiseError};
+use crate::message::handle_reaction;
+use crate::{loops, Data, GuildIdContainer};
 
 pub struct Bot {
     pub is_loop_running: AtomicBool,
@@ -20,7 +18,7 @@ pub struct Bot {
 
 #[async_trait]
 impl EventHandler for Bot {
-    async fn ready(&self, ctx: Context, ready: Ready) {
+    async fn ready(&self, ctx: Context, ready: serenity_prelude::Ready) {
         info!("{} is connected!", ready.user.name);
 
         let ctx_arc: Arc<Context> = Arc::new(ctx);
@@ -45,11 +43,10 @@ impl EventHandler for Bot {
         }
 
         // clean global commands
-        match Command::get_global_application_commands(&ctx_arc.http).await {
+        match Command::get_global_commands(&ctx_arc.http).await {
             Ok(commands) => {
                 for command in commands {
-                    if let Err(e) =
-                        Command::delete_global_application_command(&ctx_arc.http, command.id).await
+                    if let Err(e) = Command::delete_global_command(&ctx_arc.http, command.id).await
                     {
                         error!("error while deleting global applications command : {e}");
                     }
@@ -57,104 +54,87 @@ impl EventHandler for Bot {
             }
             Err(e) => error!("error while getting global application commands : {e}"),
         }
+    }
+}
 
-        let data = ctx_arc.data.read().await;
-        let Some(guild_group) = data.get::<GuildIdContainer>() else {
-            error!("There was a problem getting the guild id");
-            return;
-        };
+pub async fn register_guild(
+    ctx: &serenity_prelude::Context,
+    framework: &Framework<Data, Box<dyn Error + Send + Sync>>,
+) {
+    // getting guilds id to add commands to
+    let data = ctx.data.read().await;
+    let Some(guild_group) = data.get::<GuildIdContainer>() else {
+        error!("There was a problem getting the guild id");
+        return;
+    };
 
-        let mut results: Vec<(GuildId, Result<Vec<Command>, serenity::Error>)> = Vec::new();
-        for guild in &guild_group.0 {
-            results.push((
-                *guild,
-                guild
-                    .set_application_commands(&ctx_arc.http, |commands| {
-                        commands
-                            .create_application_command(general::help::register)
-                            .create_application_command(general::bonjour::register)
-                            .create_application_command(general::slide::register)
-                            .create_application_command(general::ping::register)
-                            .create_application_command(general::nerd::register_chat_input)
-                            .create_application_command(general::nerd::register_message)
-                            .create_application_command(general::id::register_user)
-                            .create_application_command(general::id::register_chat_input)
-                            .create_application_command(general::roll::register)
-                            .create_application_command(general::based::register_chat_input)
-                            .create_application_command(general::based::register_message)
-                            .create_application_command(general::tg::register)
-                            .create_application_command(macros::setup::register)
-                            .create_application_command(macros::setup::register_message)
-                            .create_application_command(pdx::setup::register)
-                    })
-                    .await,
-            ));
+    // gettings bot commands
+    let commands = &framework.options().commands;
+    let create_commands = poise::builtins::create_application_commands(commands);
+
+    let mut results: Vec<(
+        serenity_prelude::GuildId,
+        Result<Vec<Command>, serenity::Error>,
+    )> = Vec::new();
+    for guild in &guild_group.0 {
+        let x = guild.set_commands(&ctx.http, create_commands.clone()).await;
+        results.push((*guild, x));
+    }
+
+    for res in results {
+        match res.1 {
+            Ok(_) => info!("Guild {} added commands without error", res.0),
+            Err(e) => error!("Guild {} had an error adding commands : {e}", res.0),
         }
+    }
+}
 
-        for res in results {
-            match res.1 {
-                Ok(_) => info!("Guild {} added commands without error", res.0),
-                Err(e) => error!("Guild {} had an error adding commands : {e}", res.0),
+pub fn apply_desc_from(commands: &mut [poise::Command<Data, PoiseError>], locale: &str) {
+    for command in commands {
+        if let Some(desc) = command.description_localizations.get(locale) {
+            if command.description.is_none() {
+                command.description = Some(desc.to_string());
             }
         }
     }
+}
 
-    async fn interaction_create(&self, ctx: Context, interaction: SerenityInteraction) {
-        let result = match interaction {
-            ApplicationCommand(command) => {
-                let name = command.data.name.as_str();
-                let response = match command.data.kind {
-                    CommandType::ChatInput => match name {
-                        "help" => general::help::run(&ctx, &command).await,
-                        "bonjour" => general::bonjour::run(),
-                        "slide" => general::slide::run(&ctx, &command).await,
-                        "ping" => general::ping::run(&ctx).await,
-                        "nerd" => general::nerd::run_chat_input(&command.data.options),
-                        "id" => general::id::run_chat_input(&command.data.options),
-                        "roll" => general::roll::run_chat_input(&command.data.options),
-                        "basé" => general::based::run_chat_input(&command.data.options),
-                        "tg" => general::tg::run(&ctx, &command).await,
-                        "macro" => macros::setup::run(&ctx, &command).await,
-                        "pdx" => pdx::setup::run(&ctx, &command).await,
-                        _ => Response::Message(InteractionMessage::ephemeral(format!(
-                            "Unkown command ChatInput : {name}"
-                        ))),
-                    },
-                    CommandType::Message => match name {
-                        "nerd" => general::nerd::run_message(&ctx, &command).await,
-                        "basé" => general::based::run_message(&ctx, &command).await,
-                        "macro add" => macros::add::run_message_form(&ctx, &command).await,
-                        _ => Response::Message(InteractionMessage::ephemeral(format!(
-                            "Unkown command Message : {}",
-                            command.data.name
-                        ))),
-                    },
-                    CommandType::User => match name {
-                        "id" => general::id::run_user(&ctx, &command).await,
-                        _ => Response::Message(InteractionMessage::ephemeral(format!(
-                            "Unkown command User : {}",
-                            command.data.name
-                        ))),
-                    },
-                    CommandType::Unknown => {
-                        Response::Message(InteractionMessage::ephemeral("Unkown data kind"))
+pub async fn event_handler(
+    ctx: &serenity_prelude::Context,
+    event: &serenity_prelude::FullEvent,
+    _framework: poise::FrameworkContext<'_, Data, PoiseError>,
+    _: &Data,
+) -> Result<(), PoiseError> {
+    match event {
+        serenity_prelude::FullEvent::Ready { data_about_bot, .. } => {
+            info!("Logged in as {}", data_about_bot.user.name);
+        }
+        serenity_prelude::FullEvent::Message { new_message } => {
+            if msg_check(new_message) {
+                let res = match handle_reaction(ctx, new_message).await {
+                    Ok(s) => s,
+                    Err(e) => {
+                        // not important, just log and return
+                        error!("message checked err: {e}");
+                        return Ok(());
                     }
-                    _ => Response::Message(InteractionMessage::ephemeral("wildcard data kind")),
                 };
-                Interaction::new(response, ApplicationCommand(command))
+                if let Some(content) = res {
+                    let _ = new_message.channel_id.say(&ctx.http, content).await?;
+                }
+            } else if new_message.content.starts_with("$roll") {
+                let rest = new_message.content[5..].to_string();
+                if let Err(e) = roll::roll_intern_str(ctx, &new_message.channel_id, rest).await {
+                    error!("message $roll err: {e}");
+                    return Err(e);
+                }
             }
-            ModalSubmit(modal) => {
-                let response = match modal.data.custom_id.as_str() {
-                    interaction::MACRO_ADD_FORM_ID => macros::add::run_message(&ctx, &modal).await,
-                    _ => Response::Message(InteractionMessage::ephemeral("modal inconnu")),
-                };
-                Interaction::new(response, ModalSubmit(modal))
-            }
-            Ping(ping) => Interaction::new(Response::None, Ping(ping)),
-            Autocomplete(auto) => Interaction::new(Response::None, Autocomplete(auto)),
-            MessageComponent(msg) => Interaction::new(Response::None, MessageComponent(msg)),
-        };
-
-        result.send(&ctx).await;
+        }
+        _ => {}
     }
+    Ok(())
+}
+
+fn msg_check(msg: &serenity_prelude::Message) -> bool {
+    !msg.content.is_empty() && !msg.content.starts_with('$') && !msg.author.bot
 }

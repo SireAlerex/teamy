@@ -5,11 +5,7 @@ use mongodb::bson::to_document;
 use mongodb::options::UpdateModifications;
 use mongodb::results::DeleteResult;
 use mongodb::results::UpdateResult;
-use mongodb::{
-    error::Error,
-    options::{ClientOptions, ResolverConfig},
-    Client, Collection,
-};
+use mongodb::{error::Error, options::ClientOptions, Client, Collection};
 use serenity::futures::TryStreamExt;
 use serenity::prelude::Context;
 
@@ -70,15 +66,17 @@ pub fn mongodb_error<T: Into<String>>(message: T) -> Error {
 async fn get_client(ctx: &Context) -> Result<Client, Error> {
     let data = ctx.data.read().await;
     if let Some(db) = data.get::<DatabaseUriContainer>() {
-        let options =
-            ClientOptions::parse_with_resolver_config(&db.0, ResolverConfig::cloudflare()).await?;
+        let options = ClientOptions::parse(&db.0).await?; // FIXME: very slow
         Client::with_options(options)
     } else {
         Err(mongodb_error("no db uri"))
     }
 }
 
-pub async fn get_coll<'a, T: core::fmt::Debug + serde::Deserialize<'a> + serde::Serialize>(
+pub async fn get_coll<
+    'a,
+    T: core::fmt::Debug + serde::Deserialize<'a> + serde::Serialize + Send + Sync,
+>(
     ctx: &Context,
     collection: &str,
 ) -> Result<Collection<T>, Error> {
@@ -103,7 +101,7 @@ pub async fn get_object<
     let coll: Collection<T> = get_coll(ctx, collection).await?;
     let mut doc_filter = to_document(&object)?;
     doc_filter.remove("_id");
-    let o = coll.find_one(doc_filter, None).await?;
+    let o = coll.find_one(doc_filter).await?;
     Ok(o)
 }
 
@@ -119,12 +117,16 @@ pub async fn get_objects<
     collection: &str,
     filter: impl Into<Option<Document>>,
 ) -> Result<Vec<T>, Error> {
-    get_coll::<T>(ctx, collection)
-        .await?
-        .find(filter, None)
-        .await?
-        .try_collect::<Vec<T>>()
-        .await
+    if let Some(document) = filter.into() {
+        get_coll::<T>(ctx, collection)
+            .await?
+            .find(document)
+            .await?
+            .try_collect::<Vec<T>>()
+            .await
+    } else {
+        Err(mongodb_error("get_objects: can't filter into document"))
+    }
 }
 
 pub async fn is_object_in_coll<
@@ -161,7 +163,7 @@ pub async fn insert<
     if is_object_in_coll(ctx, collection, object).await? {
         Err(mongodb_error("l'objet à insérer existe déjà"))
     } else {
-        Ok(coll.insert_one(object, None).await?.inserted_id)
+        Ok(coll.insert_one(object).await?.inserted_id)
     }
 }
 
@@ -186,7 +188,6 @@ pub async fn update<
                     .update_one(
                         doc! {"_id": to_document(&res)?.get("_id")},
                         (*update).clone(),
-                        None,
                     )
                     .await?;
                 Ok(())
@@ -214,7 +215,7 @@ pub async fn update_query<
     update: impl Into<UpdateModifications>,
 ) -> Result<UpdateResult, Error> {
     let coll: Collection<T> = get_coll(ctx, collection).await?;
-    coll.update_one(query, update, None).await
+    coll.update_one(query, update).await
 }
 
 pub async fn delete<
@@ -234,7 +235,7 @@ pub async fn delete<
         match o {
             Some(res) => {
                 let _: DeleteResult = coll
-                    .delete_one(doc! {"_id": to_document(&res)?.get("_id")}, None)
+                    .delete_one(doc! {"_id": to_document(&res)?.get("_id")})
                     .await?;
                 Ok(())
             }
@@ -259,10 +260,14 @@ pub async fn find_filter<
     collection: &str,
     filter: impl Into<Option<Document>>,
 ) -> Result<Option<T>, Error> {
-    get_coll::<T>(ctx, collection)
-        .await?
-        .find_one(filter, None)
-        .await
+    if let Some(document) = filter.into() {
+        get_coll::<T>(ctx, collection)
+            .await?
+            .find_one(document)
+            .await
+    } else {
+        Err(mongodb_error("find_filter: can't filter into document"))
+    }
 }
 
 pub async fn delete_query<
@@ -279,7 +284,7 @@ pub async fn delete_query<
 ) -> Result<(), Error> {
     get_coll::<T>(ctx, collection)
         .await?
-        .delete_one(query, None)
+        .delete_one(query)
         .await?;
     Ok(())
 }
@@ -298,7 +303,7 @@ pub async fn delete_multiple_query<
 ) -> Result<(), Error> {
     get_coll::<T>(ctx, collection)
         .await?
-        .delete_many(query, None)
+        .delete_many(query)
         .await?;
     Ok(())
 }
