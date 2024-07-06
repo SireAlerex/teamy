@@ -1,6 +1,7 @@
 use crate::Data;
 
 pub mod general;
+pub mod admin;
 // pub mod macros;
 // pub mod pdx;
 

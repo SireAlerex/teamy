@@ -14,7 +14,7 @@ pub mod utils;
 // pub mod web_scraper;
 
 use anyhow::anyhow;
-use commands::general::{
+use commands::{admin::register::register, general::{
     based::{based, based_message, based_user},
     hello::hello,
     help::help,
@@ -23,7 +23,7 @@ use commands::general::{
     ping::ping,
     roll::{roll, roll_prefix},
     slide::slide,
-};
+}};
 use serenity::model::prelude::{ChannelId, GuildId};
 use serenity::prelude::*;
 use shuttle_runtime::SecretStore;
@@ -63,6 +63,7 @@ async fn serenity(
         roll(),
         roll_prefix(),
         slide(),
+        register()
     ];
     bot::apply_desc_from(&mut commands, "fr");
 
