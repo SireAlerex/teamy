@@ -1,6 +1,7 @@
 use crate::commands::{Context, PoiseError};
 
 #[poise::command(
+    prefix_command,
     slash_command,
     category = "admin",
     hide_in_help,
