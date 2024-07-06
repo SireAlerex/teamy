@@ -102,7 +102,7 @@ pub fn apply_desc_from(commands: &mut [poise::Command<Data, PoiseError>], locale
 pub async fn event_handler(
     ctx: &serenity_prelude::Context,
     event: &serenity_prelude::FullEvent,
-    _framework: poise::FrameworkContext<'_, Data, PoiseError>,
+    _: poise::FrameworkContext<'_, Data, PoiseError>,
     _: &Data,
 ) -> Result<(), PoiseError> {
     match event {

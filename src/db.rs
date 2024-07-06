@@ -18,8 +18,8 @@ pub struct User {
 }
 
 impl User {
-    pub fn builder(user_id: String) -> User {
-        User {
+    pub fn builder(user_id: String) -> Self {
+        Self {
             _id: mongodb::bson::oid::ObjectId::new(),
             user_id,
         }
@@ -33,8 +33,8 @@ pub struct Chan {
 }
 
 impl Chan {
-    pub fn builder(channel_id: String) -> Chan {
-        Chan {
+    pub fn builder(channel_id: String) -> Self {
+        Self {
             _id: mongodb::bson::oid::ObjectId::new(),
             channel_id,
         }
@@ -48,8 +48,8 @@ pub struct Guild {
 }
 
 impl Guild {
-    pub fn builder(guild_id: String) -> Guild {
-        Guild {
+    pub fn builder(guild_id: String) -> Self {
+        Self {
             _id: mongodb::bson::oid::ObjectId::new(),
             guild_id,
         }

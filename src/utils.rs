@@ -31,7 +31,7 @@ impl RunnerInfo {
         let Some(runner) = runners.get(&ShardId(ctx.shard_id.0)) else {
             return Err("No shard found");
         };
-        Ok(RunnerInfo {
+        Ok(Self {
             latency: runner.latency,
             connection: Some(runner.stage),
         })
@@ -84,14 +84,10 @@ pub fn remove_suffix(s: &str) -> String {
 }
 
 pub fn strip_prefix_suffix(initial_string: &str, c: char) -> String {
-    let string_prefix = match initial_string.strip_prefix(c) {
-        Some(s) => s,
-        None => initial_string,
-    };
-    match string_prefix.strip_suffix(c) {
-        Some(s) => s.to_owned(),
-        None => string_prefix.to_owned(),
-    }
+    let string_prefix = initial_string.strip_prefix(c).map_or(initial_string, |s| s);
+    string_prefix
+        .strip_suffix(c)
+        .map_or_else(|| string_prefix.to_owned(), |s| s.to_owned())
 }
 
 pub fn nerdify(text: &str) -> String {
@@ -107,13 +103,11 @@ pub fn nerdify(text: &str) -> String {
 }
 
 pub fn admin_command(command: &CommandInteraction) -> bool {
-    match command.member.as_ref() {
-        Some(member) => match member.permissions {
-            Some(perm) => perm.administrator(),
-            None => false,
-        },
-        None => false,
-    }
+    command.member.as_ref().map_or(false, |member| {
+        member
+            .permissions
+            .map_or(false, |perm| perm.administrator())
+    })
 }
 
 pub async fn say_or_error<T: Into<String>>(ctx: &Context, channel_id: ChannelId, content: T) {

@@ -14,16 +14,19 @@ pub mod utils;
 // pub mod web_scraper;
 
 use anyhow::anyhow;
-use commands::{admin::register::register, general::{
-    based::{based, based_message, based_user},
-    hello::hello,
-    help::help,
-    id::{id, id_user},
-    nerd::{nerd, nerd_message},
-    ping::ping,
-    roll::{roll, roll_prefix},
-    slide::slide,
-}};
+use commands::{
+    admin::register::register,
+    general::{
+        based::{based, based_message, based_user},
+        hello::hello,
+        help::help,
+        id::{id, id_user},
+        nerd::{nerd, nerd_message},
+        ping::ping,
+        roll::{roll, roll_prefix},
+        slide::slide,
+    },
+};
 use serenity::model::prelude::{ChannelId, GuildId};
 use serenity::prelude::*;
 use shuttle_runtime::SecretStore;
@@ -63,7 +66,7 @@ async fn serenity(
         roll(),
         roll_prefix(),
         slide(),
-        register()
+        register(),
     ];
     bot::apply_desc_from(&mut commands, "fr");
 

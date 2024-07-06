@@ -8,11 +8,11 @@ use crate::commands::{Context as PoiseContext, PoiseError};
 )]
 pub async fn ping(ctx: PoiseContext<'_>) -> Result<(), PoiseError> {
     let ping = ctx.ping().await;
-    let res = if !ping.is_zero() {
-        format!("``{:#?}``", ping)
-    } else {
+    let res = if ping.is_zero() {
         "(il y a un problème pour accéder à la latence du bot, veuillez réessayer dans 1min)"
             .to_string()
+    } else {
+        format!("``{ping:#?}``")
     };
 
     ctx.say(format!("Pong! {res}")).await?;

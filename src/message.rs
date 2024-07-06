@@ -77,10 +77,9 @@ fn present_words(string: &str, targets: &[&str]) -> bool {
 
 fn _capitalize(s: &str) -> String {
     let mut c = s.chars();
-    match c.next() {
-        None => String::new(),
-        Some(f) => format!("{}{}", f.to_uppercase().collect::<String>(), c.as_str()),
-    }
+    c.next().map_or_else(String::new, |f| {
+        format!("{}{}", f.to_uppercase().collect::<String>(), c.as_str())
+    })
 }
 
 fn choose<'a>(choices: &[&'a str]) -> &'a str {
@@ -99,11 +98,10 @@ async fn find_emoji(ctx: &Context, guild: Option<GuildId>, name: &str) -> Option
 }
 
 async fn emoji_or(ctx: &Context, guild_id: Option<GuildId>, name: &str) -> String {
-    if let Some(emoji) = find_emoji(ctx, guild_id, name).await {
-        emoji.to_string()
-    } else {
-        format!("<veuillez imaginer l'emoji \"{name}\">")
-    }
+    (find_emoji(ctx, guild_id, name).await).map_or_else(
+        || format!("<veuillez imaginer l'emoji \"{name}\">"),
+        |emoji| emoji.to_string(),
+    )
 }
 
 fn bot(message: &str) -> bool {

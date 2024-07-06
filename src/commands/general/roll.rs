@@ -22,7 +22,7 @@ impl FromStr for DropKeep {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
         if s.is_empty() {
-            return Ok(DropKeep::None);
+            return Ok(Self::None);
         }
 
         let re = regex::Regex::new(r"(?P<dk>kh|kl|k|dh|dl|d)(?P<dk_val>\d+)")?;
@@ -33,7 +33,7 @@ impl FromStr for DropKeep {
         let dk = if let Some(m) = caps.name("dk") {
             m.as_str()
         } else {
-            return Ok(DropKeep::None);
+            return Ok(Self::None);
         };
         let dk_val = match caps.name("dk_val") {
             Some(m) => m.as_str(),
@@ -42,10 +42,10 @@ impl FromStr for DropKeep {
         .parse::<u64>()?;
 
         match dk {
-            "d" | "dl" => Ok(DropKeep::DL(dk_val)),
-            "dh" => Ok(DropKeep::DH(dk_val)),
-            "k" | "kh" => Ok(DropKeep::KH(dk_val)),
-            "kl" => Ok(DropKeep::KL(dk_val)),
+            "d" | "dl" => Ok(Self::DL(dk_val)),
+            "dh" => Ok(Self::DH(dk_val)),
+            "k" | "kh" => Ok(Self::KH(dk_val)),
+            "kl" => Ok(Self::KL(dk_val)),
             _ => Err(anyhow!("erreur roll regex drop/keep : dk")),
         }
     }
@@ -54,11 +54,11 @@ impl FromStr for DropKeep {
 impl std::fmt::Display for DropKeep {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         let s = match self {
-            DropKeep::DL(x) => format!("d{x}"),
-            DropKeep::DH(x) => format!("dh{x}"),
-            DropKeep::KH(x) => format!("k{x}"),
-            DropKeep::KL(x) => format!("kl{x}"),
-            DropKeep::None => String::new(),
+            Self::DL(x) => format!("d{x}"),
+            Self::DH(x) => format!("dh{x}"),
+            Self::KH(x) => format!("k{x}"),
+            Self::KL(x) => format!("kl{x}"),
+            Self::None => String::new(),
         };
         write!(f, "{s}")
     }
@@ -66,13 +66,13 @@ impl std::fmt::Display for DropKeep {
 
 impl DropKeep {
     pub fn is_some(&self) -> bool {
-        *self != DropKeep::None
+        *self != Self::None
     }
 
-    pub fn get(&self) -> Option<u64> {
+    pub const fn get(&self) -> Option<u64> {
         match self {
-            DropKeep::DH(x) | DropKeep::DL(x) | DropKeep::KH(x) | DropKeep::KL(x) => Some(*x),
-            DropKeep::None => None,
+            Self::DH(x) | Self::DL(x) | Self::KH(x) | Self::KL(x) => Some(*x),
+            Self::None => None,
         }
     }
 }
@@ -87,8 +87,8 @@ pub struct Roll {
 
 impl Roll {
     #[allow(dead_code)]
-    pub fn new() -> Roll {
-        Roll::default()
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn roll(&self) -> Result<RollResult, &str> {
@@ -137,7 +137,7 @@ impl Roll {
 
 impl Default for Roll {
     fn default() -> Self {
-        Roll {
+        Self {
             number: 1,
             size: 6,
             modifier: 0,
@@ -169,14 +169,14 @@ impl FromStr for Roll {
             return Err(anyhow!("erreur captures regex"));
         };
 
-        let number = match caps.name("number") {
-            Some(n) => n.as_str(),
-            None => "1",
-        }
-        .parse::<u64>()?;
+        let number = caps
+            .name("number")
+            .map_or("1", |n| n.as_str())
+            .parse::<u64>()?;
         if !(1..=200).contains(&number) {
             return Err(anyhow!("le nombre de dés doit appartenir à [1; 200]",));
         }
+
         let size = match caps.name("size") {
             Some(m) => m.as_str().parse::<u64>()?,
             None => return Err(anyhow!("erreur pas de taille de dé")),
@@ -186,16 +186,13 @@ impl FromStr for Roll {
                 "la taille du dé doit être supérieure strictement à 1",
             ));
         }
-        let modifier = match caps.name("modifier") {
-            Some(n) => n.as_str(),
-            None => "0",
-        }
-        .parse::<i64>()?;
-        let dk: DropKeep = DropKeep::from_str(match caps.name("dk") {
-            Some(m) => m.as_str(),
-            None => "",
-        })?;
 
+        let modifier = caps
+            .name("modifier")
+            .map_or("0", |n| n.as_str())
+            .parse::<i64>()?;
+
+        let dk = DropKeep::from_str(caps.name("dk").map_or("", |n| n.as_str()))?;
         if let Some(x) = dk.get() {
             if x > number {
                 return Err(anyhow!("valeur du drop/keep doit être <= nombre de dés",));
@@ -222,7 +219,7 @@ pub struct RollBuilder {
 
 impl Default for RollBuilder {
     fn default() -> Self {
-        RollBuilder {
+        Self {
             number: 1,
             size: 6,
             modifier: 0,
@@ -232,8 +229,8 @@ impl Default for RollBuilder {
 }
 
 impl RollBuilder {
-    pub fn new() -> RollBuilder {
-        RollBuilder::default()
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn number(&mut self, number: u64) -> &mut Self {
